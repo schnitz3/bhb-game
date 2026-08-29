@@ -7,7 +7,7 @@
  *     served from the cache first and the network is only a fallback.
  * Bump CACHE when you rename or remove an asset.
  */
-var CACHE = 'bhb-game-v3';
+var CACHE = 'bhb-game-v4';
 
 var CORE = [
   './', './index.html', './styles.css', './manifest.webmanifest',
@@ -26,8 +26,9 @@ var CORE = [
   CORE.push('./assets/bob/' + n + '.png');
 });
 
-['ButtonClick', 'Drop', 'Falling', 'Laugh', 'LevelPassed', 'WalkStep', 'Weee', 'Yowwy', 'Beep']
+['ButtonClick', 'Drop', 'Falling', 'Laugh', 'LevelPassed', 'WalkStep', 'Weee', 'Yowwy']
   .forEach(function (n) { CORE.push('./assets/audio/' + n + '.mp3'); });
+CORE.push('./assets/audio/ReadySetGo.m4a');
 
 /* The music is ~1.8 MB and the game is fully playable without it, so it is
    cached only once a player has actually heard it. */

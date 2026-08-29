@@ -41,6 +41,16 @@
   var TORNADO_MIN = 15;           // soonest a twister can arrive, in seconds
   var TORNADO_MAX = 30;           // and the longest you will wait for one
 
+  /* The countdown signs are timed off the spoken clip rather than off a fixed
+     beat. These are the measured onsets of "Ready", "Set" and "Go!" in
+     assets/audio/ReadySetGo.m4a; re-measure them if that recording is replaced. */
+  var COUNT_WORDS = [
+    { at: 0.45, word: 'READY' },
+    { at: 1.61, word: 'SET' },
+    { at: 2.54, word: 'GO!' }
+  ];
+  var COUNT_END = 3.05;           // the walk begins as "Go!" finishes
+
   var BRAND = {
     blue: '#38b6ff', red: '#ff3131', purple: '#cb6ce6',
     pink: '#ff66c4', ink: '#123a5c'
@@ -69,13 +79,15 @@
     musicWanted: false,
     unlocked: false,
 
-    load: function (base, names) {
+    /* Names carry their own extension: the countdown is an .m4a voice clip
+       while the effects are .mp3, and they are keyed by the bare name. */
+    load: function (base, files) {
       var self = this;
-      names.forEach(function (n) {
+      files.forEach(function (f) {
         var a = new Audio();
         a.preload = 'auto';
-        a.src = base + n + '.mp3';
-        self.buffers[n] = a;
+        a.src = base + f;
+        self.buffers[f.replace(/\.[^.]+$/, '')] = a;
       });
     },
 
@@ -101,6 +113,20 @@
       var a = src.cloneNode();
       a.volume = vol == null ? 1 : vol;
       if (rate) { a.playbackRate = rate; }
+      var p = a.play();
+      if (p && p.catch) { p.catch(function () { /* blocked until a gesture */ }); }
+    },
+
+    /* Plays the preloaded element itself rather than a clone. Clones can go back
+       to the network before they start, and the countdown signs are timed off
+       the spoken words, so any start latency shows up as drift. Only safe for
+       clips that never overlap themselves. */
+    playOnce: function (name, vol) {
+      if (this.muted) { return; }
+      var a = this.buffers[name];
+      if (!a) { return; }
+      try { a.pause(); a.currentTime = 0; } catch (e) { /* not seekable yet */ }
+      a.volume = vol == null ? 1 : vol;
       var p = a.play();
       if (p && p.catch) { p.catch(function () { /* blocked until a gesture */ }); }
     },
@@ -295,7 +321,11 @@
   var resizeTimer;
   function scheduleResize() {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(resize, 60);
+    resizeTimer = setTimeout(function () {
+      resize();
+      // an iframe can report zero height for a frame or two after load
+      if (!world.sky) { resizeTimer = setTimeout(scheduleResize, 120); }
+    }, 60);
   }
   window.addEventListener('resize', scheduleResize);
   window.addEventListener('orientationchange', scheduleResize);
@@ -440,6 +470,8 @@
   }
 
   function toTitle() {
+    var rsg = Audio_.buffers.ReadySetGo;
+    if (rsg) { rsg.pause(); }
     S.mode = 'title';
     resetBob();
     el.app.classList.remove('playing');
@@ -459,7 +491,8 @@
     if (!Store.get('taught', false)) { startTutorial(); return; }
     resetBob();
     S.mode = 'play';
-    S.countdown = { t: 0, step: -1 };
+    S.countdown = { t: 0 };
+    Audio_.playOnce('ReadySetGo', 0.85);
     el.app.classList.add('playing');
     el.hud.hidden = false;
     el.hud.classList.remove('menu');
@@ -679,12 +712,7 @@
     if (S.mode === 'play') {
       if (S.countdown) {
         S.countdown.t += dt;
-        var stepIdx = Math.floor(S.countdown.t / 0.62);
-        if (stepIdx !== S.countdown.step && stepIdx < 3) {
-          S.countdown.step = stepIdx;
-          Audio_.play('Beep', 0.245);
-        }
-        if (S.countdown.t >= 1.86) { S.countdown = null; }
+        if (S.countdown.t >= COUNT_END) { S.countdown = null; }
       } else {
         S.elapsed += dt;
         stepPhysics(dt);
@@ -873,11 +901,22 @@
 
   function drawCountdown() {
     if (!S.countdown) { return; }
-    var words = ['READY', 'SET', 'GO!'];
-    var i = clamp(Math.floor(S.countdown.t / 0.62) || 0, 0, words.length - 1);
-    var local = (S.countdown.t - i * 0.62) / 0.62;
-    var scale = 0.7 + (1 - Math.pow(1 - Math.min(1, local * 2.4), 3)) * 0.35;
-    var alpha = local > 0.75 ? 1 - (local - 0.75) / 0.25 : 1;
+    var t = S.countdown.t;
+
+    // which word is being spoken, and how far through its slot we are
+    var i = -1;
+    for (var k = 0; k < COUNT_WORDS.length; k++) {
+      if (t >= COUNT_WORDS[k].at) { i = k; }
+    }
+    if (i < 0) { return; }                 // the clip's short lead-in
+    var from = COUNT_WORDS[i].at;
+    var to = (i + 1 < COUNT_WORDS.length) ? COUNT_WORDS[i + 1].at : COUNT_END;
+    var span = Math.max(0.2, to - from);
+    var local = (t - from) / span;
+
+    // snap in on the word, hold, then fade before the next one
+    var scale = 0.7 + (1 - Math.pow(1 - Math.min(1, (t - from) / 0.22), 3)) * 0.35;
+    var alpha = local > 0.72 ? Math.max(0, 1 - (local - 0.72) / 0.28) : 1;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -890,9 +929,9 @@
     ctx.lineWidth = size * 0.16;
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#ffffff';
-    ctx.strokeText(words[i], 0, 0);
-    ctx.fillStyle = i === 2 ? BRAND.pink : BRAND.blue;
-    ctx.fillText(words[i], 0, 0);
+    ctx.strokeText(COUNT_WORDS[i].word, 0, 0);
+    ctx.fillStyle = i === COUNT_WORDS.length - 1 ? BRAND.pink : BRAND.blue;
+    ctx.fillText(COUNT_WORDS[i].word, 0, 0);
     ctx.restore();
   }
 
@@ -950,6 +989,7 @@
 
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!world.sky) { return; }          // nothing to draw until we have a size
     if (S.shake > 0.002) {
       var amp = S.shake * Math.min(world.w, world.h) * 0.022;
       ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
@@ -1048,8 +1088,9 @@
       el.loadBar.style.width = Math.round((done / total) * 100) + '%';
     }
 
-    Audio_.load('assets/audio/', ['ButtonClick', 'Drop', 'Falling', 'Laugh',
-      'LevelPassed', 'WalkStep', 'Weee', 'Yowwy', 'Beep']);
+    Audio_.load('assets/audio/', ['ButtonClick.mp3', 'Drop.mp3', 'Falling.mp3',
+      'Laugh.mp3', 'LevelPassed.mp3', 'WalkStep.mp3', 'Weee.mp3', 'Yowwy.mp3',
+      'ReadySetGo.m4a']);
 
     // canvas text will silently fall back unless the face is actually requested
     var fonts = Promise.resolve();

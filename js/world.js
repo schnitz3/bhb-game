@@ -140,7 +140,10 @@
   };
 
   World.prototype.draw = function (ctx) {
-    var w = this.w, h = this.h;
+    // layout() bails on a zero-sized container, which happens when the page
+    // starts life hidden or inside an iframe that has not been given a height
+    // yet. Without this guard the first frame draws a null sky and throws.
+    if (!this.sky) { return false; }
 
     ctx.drawImage(this.sky, 0, 0);
 
@@ -154,6 +157,7 @@
     this._palms(ctx);
     this._sandDetail(ctx);
     if (this.gust > 0.01) { this._wind(ctx); }
+    return true;
   };
 
   /* The twister.

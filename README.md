@@ -71,11 +71,20 @@ All the tuning lives at the top of `js/game.js`:
 | `RAMP_FEET` | distance over which gravity and pace max out |
 | `PRESSURE_FEET` | slower ramp so the wind keeps building afterwards |
 | `MILESTONES` | the distances that trigger a confetti badge |
+| `COUNT_WORDS` / `COUNT_END` | when each countdown sign appears, measured off the voice clip |
 | `TORNADO_MIN` / `TORNADO_MAX` | the window, in seconds, that a twister arrives within |
 
 Because damping is heavy, holding a side settles Bob's lean speed at roughly
 `PLAYER_TORQUE / DAMPING`. If you raise `PLAYER_TORQUE`, raise `DAMPING` with it
 or a single tap will fling him across his whole range before anyone can react.
+
+### The countdown
+
+`assets/audio/ReadySetGo.m4a` is a spoken clip, and the on-screen signs are timed
+to it rather than to a fixed beat. The words land at 0.45 s, 1.61 s and 2.54 s,
+which is what `COUNT_WORDS` holds; the walk starts at `COUNT_END`, 3.05 s, as
+"Go!" finishes. If you replace the recording, re-measure the onsets and update
+those numbers or the signs will drift out of sync with the voice.
 
 ## Controls
 
@@ -94,7 +103,7 @@ js/game.js      physics, input, the practice run and game flow
 sw.js           offline cache
 assets/bob/     Bob's parts plus rig.json, which holds their positions
 assets/img/     palm tree, dolphin
-assets/audio/   sound effects and the music track
+assets/audio/   sound effects, the Ready Set Go voice clip and the music
 ```
 
 ### Where Bob comes from
