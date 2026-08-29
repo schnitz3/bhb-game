@@ -119,6 +119,19 @@ To re-export at a different size or with a different face colour, rerun the
 extraction script with a new scale. The rig reads its joints from `rig.json`,
 so nothing in the game code needs to change.
 
+## Running it locally
+
+```bash
+python3 tools/serve.py 8815
+```
+
+Use that rather than `python3 -m http.server`. The stdlib server sends no cache
+headers at all, so browsers fall back to heuristic caching and quietly keep
+serving an old copy of the game: edits then look like they did nothing, and
+clearing the service worker does not help because the stale copy is in the
+browser's HTTP cache, a different layer. `tools/serve.py` serves the same files
+with caching switched off.
+
 ## Browser support
 
 Any current browser: Safari (iOS 13+), Chrome, Firefox, Edge, Samsung Internet.

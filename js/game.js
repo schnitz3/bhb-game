@@ -265,25 +265,39 @@
     fitWordmarks();
   }
 
-  /* "Big Head Bob" always sits on one line. Rather than guessing a font size
-     that happens to fit, shrink the name until it does. Hidden panels have no
-     width to measure, so this runs whenever a panel is shown. */
+  /* "Big Head Bob" always sits on one line.
+
+     Measure the text itself with canvas metrics rather than the element's
+     scrollWidth: the name is a block, so its scrollWidth never falls below its
+     own layout width, and comparing that against the panel's slightly smaller
+     inner width is a test that can never pass. That shrank the name to its
+     minimum on any viewport where the sub-pixel rounding went the wrong way.
+     One measurement at a reference size gives the answer directly. */
+  var _probe = null;
+
   function fitWordmarks() {
+    if (!_probe) { _probe = document.createElement('canvas').getContext('2d'); }
     var marks = document.querySelectorAll('.wordmark em');
+
     for (var i = 0; i < marks.length; i++) {
       var em = marks[i];
-      var panel = em.parentNode.parentNode;
+      var panel = em.closest ? em.closest('.panel') : em.parentNode.parentNode;
       if (!panel || !panel.clientWidth) { continue; }
-      var cs = window.getComputedStyle(panel);
-      var avail = panel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+
+      var pcs = window.getComputedStyle(panel);
+      var avail = panel.clientWidth - parseFloat(pcs.paddingLeft) - parseFloat(pcs.paddingRight);
       if (!(avail > 0)) { continue; }
+
       em.style.fontSize = '';
-      var size = parseFloat(window.getComputedStyle(em).fontSize);
-      var guard = 0;
-      while (em.scrollWidth > avail && size > 13 && guard++ < 80) {
-        size -= 1;
-        em.style.fontSize = size + 'px';
-      }
+      var ecs = window.getComputedStyle(em);
+      var natural = parseFloat(ecs.fontSize);
+      _probe.font = ecs.fontStyle + ' ' + ecs.fontWeight + ' 100px ' + ecs.fontFamily;
+      var at100 = _probe.measureText(em.textContent).width;
+      if (!(at100 > 0) || !(natural > 0)) { continue; }
+
+      // a hair of slack so a rounded-up glyph advance cannot clip
+      var fitted = Math.min(natural, (avail - 2) / at100 * 100);
+      if (fitted < natural - 0.5) { em.style.fontSize = Math.max(12, Math.floor(fitted)) + 'px'; }
     }
   }
 
@@ -1108,6 +1122,11 @@
     ]).then(function () {
       resize();
       toTitle();
+      // the fallback face measures differently, so size the name again once
+      // the real one is in use
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitWordmarks).catch(function () {});
+      }
       requestAnimationFrame(frame);
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(function () { /* offline play unavailable */ });
