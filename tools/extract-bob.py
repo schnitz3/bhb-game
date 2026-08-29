@@ -67,7 +67,21 @@ def render(paths):
     return psd.composite(force=True)
 
 
-def save_part(paths, name, out_dir, scale, manifest, trim_alpha=8):
+def _band_centre(alpha, box, top):
+    """Horizontal centre of the top (or bottom) tenth of a part.
+
+    A single scanline is a poor anchor on a slanted shape like a leg, where the
+    topmost row is a two-pixel sliver at one corner.
+    """
+    h = box[3] - box[1]
+    band = max(1, int(h * 0.1))
+    y0 = box[1] if top else box[3] - band
+    strip = alpha.crop((box[0], y0, box[2], y0 + band))
+    span = strip.getbbox()   # already relative to the crop
+    return ((span[0] + span[2]) * 0.5) if span else ((box[2] - box[0]) * 0.5)
+
+
+def save_part(paths, name, out_dir, scale, manifest, trim_alpha=8, joint_from=None):
     img = render(paths)
     # ignore near-transparent fringe pixels when finding the crop box
     alpha = img.getchannel('A').point(lambda v: 255 if v > trim_alpha else 0)
@@ -77,6 +91,16 @@ def save_part(paths, name, out_dir, scale, manifest, trim_alpha=8):
     img = img.crop(box)
     w = max(1, round(img.width * scale))
     h = max(1, round(img.height * scale))
+    # Joints come from the artwork rather than from constants that rot the moment
+    # anything is redrawn: the top anchor is a hip or a shoulder, the bottom one
+    # is where the hair curl roots into the scalp.
+    if joint_from:
+        jbox = render(joint_from).getbbox()
+        top_cx = (jbox[0] + jbox[2]) * 0.5 - box[0]   # jbox is canvas-absolute
+    else:
+        top_cx = _band_centre(alpha, box, True)
+    bot_cx = _band_centre(alpha, box, False)
+
     img = img.resize((w, h), Image.LANCZOS)
     img.save(os.path.join(out_dir, name + ".png"), optimize=True)
     manifest[name] = {
@@ -84,6 +108,8 @@ def save_part(paths, name, out_dir, scale, manifest, trim_alpha=8):
         "y": round(box[1] * scale, 2),
         "w": w,
         "h": h,
+        "topCx": round(top_cx * scale, 2),
+        "botCx": round(bot_cx * scale, 2),
     }
     print("%-14s psd=%s -> %dx%d" % (name, box, w, h))
 
@@ -95,15 +121,16 @@ if __name__ == "__main__":
 
     SP = "/+BHB/+Standing Profile"
     HEAD = SP + "/Head/+Frontal"
-    FACE = "Blue"          # face tint variant
+    FACE = "Gray transparent"   # translucent head, picks up the sky and sand behind it
     SKIN = "Gray"          # hand/limb variant
 
     manifest = {}
     P = lambda *paths: list(paths)
 
     # ---- head, broken into independently animatable pieces ----
-    save_part(P(HEAD + "/Face bg/" + FACE, HEAD + "/Nose/nose", HEAD + "/+Hair"),
+    save_part(P(HEAD + "/Face bg/" + FACE, HEAD + "/Nose/nose"),
               "face", out_dir, scale, manifest)
+    save_part(P(HEAD + "/+Hair"), "hair", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Left Eye/Left Eyeball"), "eyeL", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Right Eye/Right Eyeball"), "eyeR", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Left Eye/+Left Pupil/eye ball",
@@ -128,9 +155,11 @@ if __name__ == "__main__":
                 SP + "/body/Body bg/Torso",
                 SP + "/body/Body bg/Jacket/jacket"), "torso", out_dir, scale, manifest)
     save_part(P(SP + "/body/+Left Leg/Pent", SP + "/body/+Left Leg/L Shoe"),
-              "legL", out_dir, scale, manifest)
+              "legL", out_dir, scale, manifest,
+              joint_from=[SP + "/body/+Left Leg/Pent"])
     save_part(P(SP + "/body/+Right Leg/Pent", SP + "/body/+Right Leg/R Shoe"),
-              "legR", out_dir, scale, manifest)
+              "legR", out_dir, scale, manifest,
+              joint_from=[SP + "/body/+Right Leg/Pent"])
 
     # ---- arms: four raise steps per side, from hanging down to straight out ----
     arms_r = [

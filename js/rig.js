@@ -9,7 +9,7 @@
   'use strict';
 
   var PARTS = [
-    'face', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR',
+    'face', 'hair', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR',
     'browL', 'browR',
     'mouthSmile', 'mouthNeutral', 'mouthOh', 'mouthWow', 'mouthSad',
     'torso', 'legL', 'legR',
@@ -63,22 +63,28 @@
      PSD at a different scale keeps everything lined up. */
   BobRig.prototype._deriveJoints = function () {
     var m = this.m;
-    var legL = m.legL, legR = m.legR, torso = m.torso, face = m.face;
+    var legL = m.legL, legR = m.legR, torso = m.torso, face = m.face, hair = m.hair;
 
-    this.hipL = { x: legL.x + legL.w * 0.5, y: legL.y + 4 };
-    this.hipR = { x: legR.x + legR.w * 0.5, y: legR.y + 4 };
+    // topCx is the centre of each part's top edge, measured off the artwork, so
+    // the hips land on the trouser tops rather than on the bounding boxes (the
+    // shoes stick out sideways and would drag the pivot off-centre).
+    this.hipL = { x: legL.x + legL.topCx, y: legL.y + 4 };
+    this.hipR = { x: legR.x + legR.topCx, y: legR.y + 4 };
 
     // stand Bob on the lowest point of his shoes, centred between his hips
     this.feetY = Math.max(legL.y + legL.h, legR.y + legR.h);
     this.centreX = (this.hipL.x + this.hipR.x) * 0.5;
 
     // the neck: top-centre of the torso, where the head sits
-    this.neck = { x: torso.x + torso.w * 0.5, y: torso.y + torso.h * 0.06 };
+    this.neck = { x: torso.x + torso.topCx, y: torso.y + torso.h * 0.06 };
+
+    // the curl roots into the scalp at the bottom of its own artwork
+    this.hairRoot = { x: hair.x + hair.botCx, y: hair.y + hair.h };
 
     this.shoulderL = { x: m.armL0.x + 2, y: m.armL0.y + 6 };
     this.shoulderR = { x: m.armR0.x + m.armR0.w - 2, y: m.armR0.y + 6 };
 
-    this.topY = Math.min(face.y, torso.y);
+    this.topY = Math.min(face.y, hair.y, torso.y);
     this.rigHeight = this.feetY - this.topY;
     this.headWidth = face.w;
   };
@@ -131,10 +137,16 @@
     var self = this;
 
     // --- legs, behind everything: they pivot at the hips ---
+    // The puppet stands with its shoes splayed outward, which reads as a stance
+    // rather than a walk. Mirroring the screen-left leg about its own hip points
+    // both feet the way he is travelling.
     this._rotateAbout(ctx, this.hipL, swing * 0.33, function () {
       self._blit(ctx, 'legL');
     });
     this._rotateAbout(ctx, this.hipR, -swing * 0.33, function () {
+      ctx.translate(self.hipR.x, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-self.hipR.x, 0);
       self._blit(ctx, 'legR');
     });
 
@@ -155,6 +167,13 @@
       var nod = walk == null ? 0 : lift * 3;
       self._blit(ctx, 'face', 0, -nod);
       self._drawFace(ctx, pose, -nod);
+      // the curl swings on its own, a beat behind the head
+      ctx.save();
+      ctx.translate(0, -nod);
+      self._rotateAbout(ctx, self.hairRoot, pose.hair || 0, function () {
+        self._blit(ctx, 'hair');
+      });
+      ctx.restore();
     });
 
     ctx.restore();

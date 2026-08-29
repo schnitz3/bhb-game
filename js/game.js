@@ -29,14 +29,17 @@
   var TILT_DEADZONE = 4;          // degrees of device tilt ignored
 
   var MILESTONES = [
-    { ft: 100, word: 'NICE!' },
-    { ft: 250, word: 'RESPECT!' },
-    { ft: 500, word: 'LOVE!' },
-    { ft: 900, word: 'PEACE!' },
-    { ft: 1400, word: 'WOW!' },
-    { ft: 2000, word: 'LEGEND!' },
-    { ft: 3000, word: 'UNREAL!' }
+    { ft: 60, word: 'NICE!' },
+    { ft: 150, word: 'RESPECT!' },
+    { ft: 300, word: 'LOVE!' },
+    { ft: 600, word: 'PEACE!' },
+    { ft: 1000, word: 'WOW!' },
+    { ft: 1600, word: 'LEGEND!' },
+    { ft: 2400, word: 'UNREAL!' }
   ];
+
+  var TORNADO_FROM = 220;         // feet before the first one can show up
+  var TORNADO_EVERY = 34;         // seconds between them, roughly
 
   var BRAND = {
     blue: '#38b6ff', red: '#ff3131', purple: '#cb6ce6',
@@ -191,6 +194,11 @@
     blinkTimer: 2,
     headTilt: 0,
     headVel: 0,
+    hairAngle: 0,
+    hairVel: 0,
+    shake: 0,
+    tornado: null,
+    nextTornado: TORNADO_EVERY,
     gustIn: -1,
     gustDir: 1,
     nextGust: 3,
@@ -223,6 +231,29 @@
   function showPanel(name) {
     Object.keys(el.panels).forEach(function (k) { el.panels[k].hidden = (k !== name); });
     el.overlay.hidden = !name;
+    fitWordmarks();
+  }
+
+  /* "Big Head Bob" always sits on one line. Rather than guessing a font size
+     that happens to fit, shrink the name until it does. Hidden panels have no
+     width to measure, so this runs whenever a panel is shown. */
+  function fitWordmarks() {
+    var marks = document.querySelectorAll('.wordmark em');
+    for (var i = 0; i < marks.length; i++) {
+      var em = marks[i];
+      var panel = em.parentNode.parentNode;
+      if (!panel || !panel.clientWidth) { continue; }
+      var cs = window.getComputedStyle(panel);
+      var avail = panel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (!(avail > 0)) { continue; }
+      em.style.fontSize = '';
+      var size = parseFloat(window.getComputedStyle(em).fontSize);
+      var guard = 0;
+      while (em.scrollWidth > avail && size > 13 && guard++ < 80) {
+        size -= 1;
+        em.style.fontSize = size + 'px';
+      }
+    }
   }
 
   function coach(text, urgent) {
@@ -253,6 +284,7 @@
     world.layout(w, h);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     trackW = el.meterTrack.clientWidth;
+    fitWordmarks();
   }
 
   var resizeTimer;
@@ -346,7 +378,7 @@
       S.tiltOn = true;
       Store.set('tilt', true);
       updateTiltButton();
-      toast('Tilt controls on — lean your device.');
+      toast('Tilt controls on. Lean your device to balance.');
     }
     if (typeof DOE.requestPermission === 'function') {
       DOE.requestPermission().then(function (r) {
@@ -393,6 +425,12 @@
     S.gustIn = -1;
     S.nextGust = 3.4;
     S.fallT = 0;
+    S.hairAngle = 0;
+    S.hairVel = 0;
+    S.shake = 0;
+    S.tornado = null;
+    S.nextTornado = TORNADO_EVERY;
+    world.setTornado(null);
     fx.clear();
   }
 
@@ -407,8 +445,8 @@
     el.titleBest.hidden = !(S.best > 0);
     if (S.best > 0) { el.titleBest.querySelector('strong').textContent = Math.round(S.best); }
     el.titleHint.textContent = Store.get('taught', false)
-      ? 'Hold a side of the screen to keep Bob upright.'
-      : 'First time? Take the practice run — it only takes a moment.';
+      ? 'Hold either side of the screen to keep Bob upright.'
+      : 'First time? The practice run only takes a moment.';
     showPanel('title');
   }
 
@@ -524,6 +562,31 @@
         world.showGust(S.gustDir);
         Audio_.play('WalkStep', 0.25, 0.6);
       }
+      // A tornado is a rarer, much bigger event than a gust: it is announced,
+      // it rattles the whole screen, and it shoves him back and forth while it
+      // crosses rather than landing one clean hit.
+      if (S.dist > TORNADO_FROM && !S.tornado) {
+        S.nextTornado -= dt;
+        if (S.nextTornado <= 0) {
+          S.tornado = { t: 0, dur: 5.0, dir: Math.random() < 0.5 ? -1 : 1 };
+          S.nextTornado = TORNADO_EVERY + Math.random() * 18;
+          Audio_.play('Falling', 0.35, 0.6);
+        }
+      }
+      if (S.tornado) {
+        S.tornado.t += dt;
+        var tp = S.tornado.t / S.tornado.dur;
+        // intensity peaks as it sweeps past him, then falls away
+        var near = Math.max(0, 1 - Math.abs(tp - 0.55) / 0.45);
+        var bite = near * near;
+        torque += Math.sin(S.tornado.t * 8.5) * bite * (2.6 + press * 1.6);
+        torque += S.tornado.dir * bite * 0.9;
+        S.shake = Math.max(S.shake, bite * 1.45);
+        world.setTornado({ x: S.tornado.dir > 0 ? 1 - tp : tp, k: near });
+        if (tp < 0.5) { coach('TORNADO! Hold on!', true); }
+        if (S.tornado.t >= S.tornado.dur) { S.tornado = null; world.setTornado(null); }
+      }
+
       if (S.gustIn >= 0) {
         S.gustIn -= dt;
         if (S.gustIn <= 0) {
@@ -567,13 +630,13 @@
       if (holding) { S.tutorHeld += dt; }
 
       if (pressingWrong) {
-        coach(wantLeft ? 'Other side — hold the LEFT' : 'Other side — hold the RIGHT', true);
+        coach(wantLeft ? 'Other side! Hold the LEFT' : 'Other side! Hold the RIGHT', true);
       } else if (holding) {
-        coach('That is it — he is straightening up!');
+        coach('That is it. He is straightening up!');
       } else if (wantLeft) {
-        coach('Bob is leaning RIGHT — hold the LEFT side');
+        coach('Bob is leaning RIGHT, so hold the LEFT side');
       } else {
-        coach('Now he leans LEFT — hold the RIGHT side');
+        coach('Now he leans LEFT, so hold the RIGHT side');
       }
 
       el.zoneL.classList.toggle('coach', wantLeft && !holding);
@@ -628,7 +691,8 @@
           var ms = MILESTONES[S.milestone];
           S.badge = { word: ms.word, t: 0 };
           S.milestone++;
-          Audio_.play('LevelPassed', 0.6);
+          Audio_.play('LevelPassed', 0.95);
+          Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.7);
           fx.confetti(world.w * 0.28, world.h * 0.34, 60);
           fx.confetti(world.w * 0.72, world.h * 0.34, 60);
         }
@@ -645,6 +709,7 @@
       S.angle = lerp(S.fallDir * FALL_ANGLE, S.fallDir * 1.44, ease);
       if (S.fallT >= 0.52 && S.fallT - dt < 0.52) {
         Audio_.play('Drop', 0.8);
+        S.shake = Math.max(S.shake, 0.55);
         var hx = bobScreenX() + S.fallDir * world.bobHeight * 0.3;
         fx.puff(hx, world.groundY - world.bobHeight * 0.16, 22, world.bobHeight / 420);
       }
@@ -660,11 +725,25 @@
     if (S.mode === 'play' && !S.countdown) { S.walkPhase = (S.walkPhase + dt * 1.75) % 1; }
     else if (S.mode === 'tutorial' || S.mode === 'title') { S.walkPhase = (S.walkPhase + dt * 1.1) % 1; }
 
-    // head lags behind the body — that is what makes him read as top-heavy
+    // head lags behind the body, which is what makes him read as top-heavy
     var headTarget = -S.angVel * 0.16;
     S.headVel += (headTarget - S.headTilt) * 46 * dt;
     S.headVel -= S.headVel * 9 * dt;
     S.headTilt = clamp(S.headTilt + S.headVel * dt, -0.22, 0.22);
+
+    /* The curl is a dangle, the way Character Animator rigs one: a light spring
+       with very little damping, pulled by gravity toward whichever way he is
+       leaning and thrown the opposite way by any sudden movement. Because it is
+       underdamped it keeps wobbling for a moment after he stops. */
+    var hairTarget = S.angle * 0.38 - S.angVel * 0.30 - S.headTilt * 0.6;
+    if (S.mode === 'play' && !S.countdown) {
+      hairTarget += Math.sin(S.walkPhase * Math.PI * 2) * 0.09;
+    }
+    S.hairVel += (hairTarget - S.hairAngle) * 95 * dt;
+    S.hairVel -= S.hairVel * 5.0 * dt;
+    S.hairAngle = clamp(S.hairAngle + S.hairVel * dt, -1.2, 1.2);
+
+    if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 1.6); }
 
     // blinking
     S.blinkTimer -= dt;
@@ -698,7 +777,7 @@
     var caption, urgent = false;
     if (S.mode === 'falling' || S.mode === 'over') { caption = 'Down he goes'; }
     else if (mag < 0.3) { caption = 'Steady'; }
-    else if (mag < 0.62) { caption = S.angle > 0 ? 'Leaning right — hold LEFT' : 'Leaning left — hold RIGHT'; }
+    else if (mag < 0.62) { caption = S.angle > 0 ? 'Leaning right, hold LEFT' : 'Leaning left, hold RIGHT'; }
     else { caption = S.angle > 0 ? 'HOLD LEFT!' : 'HOLD RIGHT!'; urgent = true; }
 
     if (el.meterCaption.textContent !== caption) { el.meterCaption.textContent = caption; }
@@ -754,6 +833,7 @@
       height: world.bobHeight,
       lean: lean,
       headTilt: falling ? 0 : S.headTilt,
+      hair: S.hairAngle,
       walk: walking ? S.walkPhase : null,
       armL: falling ? 3 : (S.angle < -0.08 ? Math.min(3, arm + 1) : arm),
       armR: falling ? 3 : (S.angle > 0.08 ? Math.min(3, arm + 1) : arm),
@@ -849,6 +929,10 @@
 
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (S.shake > 0.002) {
+      var amp = S.shake * Math.min(world.w, world.h) * 0.022;
+      ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
+    }
     world.draw(ctx);
 
     var pose = bobPose();
@@ -917,7 +1001,7 @@
         .catch(function () { /* dismissed */ });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text + ' ' + url)
-        .then(function () { toast('Score copied — paste it anywhere!'); })
+        .then(function () { toast('Score copied. Paste it anywhere!'); })
         .catch(function () { toast(text); });
     } else { toast(text); }
   });

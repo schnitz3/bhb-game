@@ -28,6 +28,7 @@
     this.dolphinRun = null;
     this.gust = 0;
     this.gustDir = 0;
+    this.twister = null;
   }
 
   World.prototype.loadArt = function (baseUrl, onStep) {
@@ -121,6 +122,8 @@
     }
   };
 
+  World.prototype.setTornado = function (info) { this.twister = info; };
+
   World.prototype.showGust = function (dir) {
     this.gust = 1;
     this.gustDir = dir;
@@ -146,9 +149,114 @@
     this._dolphin(ctx);
     this._clouds(ctx);
     this._boats(ctx);
+    if (this.twister) { this._twister(ctx); }
     this._palms(ctx);
     this._sandDetail(ctx);
     if (this.gust > 0.01) { this._wind(ctx); }
+  };
+
+  /* The twister.
+     Drawn as one continuous silhouette around a curving centreline rather than
+     a stack of separate discs: with a translucent head in front of it, discrete
+     rings read as banding across Bob's face instead of as a funnel. */
+  World.prototype._twister = function (ctx) {
+    var T = this.twister;
+    var k = Math.max(0, Math.min(1, T.k));
+    if (k <= 0.001) { return; }
+
+    var baseY = this.sandY + (this.groundY - this.sandY) * 0.30;
+    var topY = -this.h * 0.06;
+    var height = baseY - topY;
+    var cx = this.w * T.x;
+    var maxW = Math.min(this.w, this.h) * 0.30 * (0.6 + k * 0.55);
+    var lean = Math.min(this.w, this.h) * 0.05;
+    var t = this.t;
+
+    // centreline and half-width at a height f, where f is 0 at the tip
+    function cxAt(f) { return cx + Math.sin(t * 1.3 + f * 2.4) * lean * f + f * lean * 0.5; }
+    function halfAt(f) {
+      return maxW * (0.06 + Math.pow(f, 1.45) * 0.94) *
+        (1 + Math.sin(t * 5 + f * 9) * 0.05);
+    }
+
+    var steps = 40;
+    ctx.save();
+    ctx.globalAlpha = 0.30 + k * 0.42;
+
+    function silhouette(grow) {
+      ctx.beginPath();
+      var i, f;
+      for (i = 0; i <= steps; i++) {
+        f = i / steps;
+        if (i === 0) { ctx.moveTo(cxAt(f) - halfAt(f) * grow, baseY - height * f); }
+        else { ctx.lineTo(cxAt(f) - halfAt(f) * grow, baseY - height * f); }
+      }
+      for (i = steps; i >= 0; i--) {
+        f = i / steps;
+        ctx.lineTo(cxAt(f) + halfAt(f) * grow, baseY - height * f);
+      }
+      ctx.closePath();
+    }
+
+    // a wide, faint halo first, so the edge of the funnel fades out instead of
+    // cutting a hard line wherever it passes behind something translucent
+    silhouette(1.5);
+    ctx.fillStyle = 'rgba(168,156,132,0.22)';
+    ctx.fill();
+    silhouette(1.22);
+    ctx.fillStyle = 'rgba(166,152,126,0.24)';
+    ctx.fill();
+
+    silhouette(1);
+    var g = ctx.createLinearGradient(0, topY, 0, baseY);
+    g.addColorStop(0, 'rgba(176,166,146,0.62)');
+    g.addColorStop(0.55, 'rgba(158,144,118,0.70)');
+    g.addColorStop(1, 'rgba(126,108,80,0.78)');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // churning bands spiralling up the inside of the funnel
+    ctx.save();
+    silhouette(1);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255,248,228,0.30)';
+    ctx.lineCap = 'round';
+    for (var b = 0; b < 15; b++) {
+      var bf = ((b / 15) + (t * 0.55)) % 1;
+      var by = baseY - height * bf;
+      var bh = halfAt(bf);
+      ctx.lineWidth = Math.max(1.5, height * 0.012);
+      ctx.beginPath();
+      ctx.ellipse(cxAt(bf), by, bh * 0.92, bh * 0.30, Math.sin(t * 2 + b) * 0.14,
+        0.15, Math.PI - 0.15);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // dust kicked up where the tip meets the sand
+    var dustR = maxW * 0.75;
+    var dg = ctx.createRadialGradient(cxAt(0), baseY, 0, cxAt(0), baseY, dustR);
+    dg.addColorStop(0, 'rgba(150,132,100,0.65)');
+    dg.addColorStop(1, 'rgba(150,132,100,0)');
+    ctx.fillStyle = dg;
+    ctx.beginPath();
+    ctx.ellipse(cxAt(0), baseY, dustR, dustR * 0.42, 0, 0, TAU);
+    ctx.fill();
+
+    // debris spiralling around the outside
+    ctx.fillStyle = 'rgba(104,84,52,0.75)';
+    for (var d = 0; d < 18; d++) {
+      var seed = hash(d * 4.3);
+      var df = (t * (0.45 + seed * 0.7) + seed * 3) % 1;
+      var rr = halfAt(df) * 1.15;
+      var a = t * 6.5 + d * 1.9;
+      var dsz = Math.min(this.w, this.h) * 0.009 * (0.6 + seed);
+      ctx.beginPath();
+      ctx.ellipse(cxAt(df) + Math.cos(a) * rr, baseY - height * df + Math.sin(a) * rr * 0.22,
+        dsz, dsz * 0.55, a, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
   };
 
   World.prototype._sun = function (ctx) {
@@ -206,7 +314,9 @@
     var sy = Math.floor(frame / 4) * cell;
     var size = Math.min(this.w, this.h) * 0.16;
     var x = this.w * run.x;
-    var y = this.horizonY + this.seaH * 0.55 - size * 0.5;
+    // the sprite's splash sits low in its own cell, so bias the whole arc
+    // upward until he breaks the surface instead of vanishing under the sand
+    var y = this.horizonY + this.seaH * 0.35 - size * 0.86;
 
     ctx.save();
     ctx.globalAlpha = 0.95;
@@ -288,6 +398,24 @@
     }
   };
 
+  /* A haze-tinted copy of the palm for the distant row.
+     Tinting in place with 'source-atop' would tint everything already drawn on
+     the canvas, which painted a grey rectangle behind each distant tree; doing
+     it once on an offscreen canvas keeps the tint inside the leaves. */
+  World.prototype._hazyPalm = function () {
+    if (this._hazy) { return this._hazy; }
+    var c = document.createElement('canvas');
+    c.width = this.palm.width;
+    c.height = this.palm.height;
+    var g = c.getContext('2d');
+    g.drawImage(this.palm, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(150,205,240,0.45)';
+    g.fillRect(0, 0, c.width, c.height);
+    this._hazy = c;
+    return c;
+  };
+
   World.prototype._palms = function (ctx) {
     if (!this.palm) { return; }
     var ar = this.palm.height / this.palm.width;
@@ -323,12 +451,8 @@
         ctx.translate(x, footY);
         ctx.rotate(sway);
         if (seed > 0.5) { ctx.scale(-1, 1); }
-        ctx.drawImage(this.palm, -wdt * sc * 0.5, -hgt * sc, wdt * sc, hgt * sc);
-        if (R.tint) {
-          ctx.globalCompositeOperation = 'source-atop';
-          ctx.fillStyle = 'rgba(150,205,240,0.45)';
-          ctx.fillRect(-wdt * sc, -hgt * sc, wdt * sc * 2, hgt * sc);
-        }
+        ctx.drawImage(R.tint ? this._hazyPalm() : this.palm,
+          -wdt * sc * 0.5, -hgt * sc, wdt * sc, hgt * sc);
         ctx.restore();
       }
     }

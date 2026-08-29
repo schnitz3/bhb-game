@@ -325,11 +325,22 @@ html, body {
   display: block;
   font-style: normal;
   font-weight: 700;
-  font-size: clamp(27px, 6.6vmin, 50px);
+  /* The name never breaks across lines; game.js shrinks it to fit the panel. */
+  white-space: nowrap;
+  font-size: clamp(24px, 6.6vmin, 50px);
   background: linear-gradient(100deg, var(--blue), var(--purple) 48%, var(--pink));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Balanced wrapping: the browser evens out the lines instead of leaving one
+   or two orphaned words on the last one. */
+.tagline, .hint-line, .best-line, .loading-note, .final-best, .over-kicker,
+.keys-line, .meter-caption, #coach, .steps li span:last-child,
+.panel h2, .noscript {
+  text-wrap: balance;
+  text-wrap-style: balance;
 }
 
 .tagline {
