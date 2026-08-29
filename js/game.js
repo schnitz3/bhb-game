@@ -488,6 +488,7 @@
   }
 
   function toTitle() {
+    el.app.classList.remove('teaching');
     var rsg = Audio_.buffers.ReadySetGo;
     if (rsg) { rsg.pause(); }
     S.mode = 'title';
@@ -512,6 +513,7 @@
     S.countdown = { t: 0 };
     Audio_.playOnce('ReadySetGo', 0.85);
     el.app.classList.add('playing');
+    el.app.classList.add('teaching');   // controls stay legible over the countdown
     el.hud.hidden = false;
     el.hud.classList.remove('menu');
     el.score.textContent = '0';
@@ -523,12 +525,14 @@
   }
 
   function startTutorial() {
+    el.app.classList.remove('teaching');
     resetBob();
     S.mode = 'tutorial';
     S.tutorStep = 0;
     S.tutorHeld = 0;
     S.angle = 0.30;
     el.app.classList.add('playing');
+    el.app.classList.add('teaching');   // controls stay legible over the countdown
     el.hud.hidden = false;
     el.hud.classList.remove('menu');
     el.score.textContent = '0';
@@ -558,6 +562,7 @@
   }
 
   function fall() {
+    el.app.classList.remove('teaching');
     S.mode = 'falling';
     S.fallT = 0;
     S.fallDir = S.angle > 0 ? 1 : -1;
@@ -751,7 +756,10 @@
     if (S.mode === 'play') {
       if (S.countdown) {
         S.countdown.t += dt;
-        if (S.countdown.t >= COUNT_END) { S.countdown = null; }
+        if (S.countdown.t >= COUNT_END) {
+          S.countdown = null;
+          el.app.classList.remove('teaching');
+        }
       } else {
         S.elapsed += dt;
         stepPhysics(dt);
