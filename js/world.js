@@ -183,7 +183,7 @@
     pop = Math.max(0, Math.min(1, pop));
     if (pop <= 0.001) { return; }
 
-    var size = Math.min(this.w, this.h) * 0.24;
+    var size = Math.min(this.w, this.h) * 0.34;
     var ar = this.blob.height / this.blob.width;
     var bw = size / ar * 1.0;
     var bh = size;
@@ -228,9 +228,17 @@
     ctx.strokeStyle = '#123a5c';
     ctx.stroke();
 
-    ctx.font = '700 ' + (size * 0.62) + 'px OpenDyslexic, sans-serif';
+    // fit the word to the burst: 'Muahaha!' is far wider than 'HEY!'
+    var inner = size * 1.9;
+    var fs = size * 0.62;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = '700 ' + fs + 'px OpenDyslexic, sans-serif';
+    var guard = 0;
+    while (ctx.measureText(S.word).width > inner && fs > 5 && guard++ < 60) {
+      fs *= 0.93;
+      ctx.font = '700 ' + fs + 'px OpenDyslexic, sans-serif';
+    }
     ctx.fillStyle = '#ff3131';
     ctx.fillText(S.word, 0, size * 0.02);
     ctx.restore();
@@ -665,18 +673,21 @@
     ctx.closePath();
     ctx.fill();
 
-    // flag, fluttering with the same wind that pushes the palms
+    // flag, fluttering with the same wind that pushes the palms. The pole is
+    // planted into the middle tower rather than hovering above it.
     var flag = u * 0.5;
+    var towerTop = -u * 1.6;
+    var poleBase = towerTop + u * 0.12;          // sunk into the battlements
     var sway = Math.sin(this.t * 3 + seed * 6) * 0.12 + this.gust * this.gustDir * 0.2;
     ctx.strokeStyle = '#123a5c';
     ctx.lineWidth = Math.max(1, u * 0.05);
     ctx.beginPath();
-    ctx.moveTo(0, -u * 1.6 - u * 0.28);
-    ctx.lineTo(0, -u * 1.6 - u * 0.28 - flag);
+    ctx.moveTo(0, poleBase);
+    ctx.lineTo(0, poleBase - flag);
     ctx.stroke();
     ctx.fillStyle = seed > 0.5 ? '#ff3131' : '#ff66c4';
     ctx.beginPath();
-    var fy = -u * 1.6 - u * 0.28 - flag;
+    var fy = poleBase - flag;
     ctx.moveTo(0, fy);
     ctx.quadraticCurveTo(flag * 0.55, fy + flag * (0.16 + sway), flag * 0.9, fy + flag * 0.06);
     ctx.lineTo(0, fy + flag * 0.42);

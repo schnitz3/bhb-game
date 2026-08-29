@@ -29,7 +29,6 @@
   var TILT_DEADZONE = 4;          // degrees of device tilt ignored
 
   var MILESTONES = [
-    { ft: 60, word: 'NICE!' },
     { ft: 150, word: 'RESPECT!' },
     { ft: 300, word: 'LOVE!' },
     { ft: 600, word: 'PEACE!' },
@@ -43,7 +42,7 @@
 
   var SHOUT_MIN = 9;              // the Evil Blob turns up more often than a
   var SHOUT_MAX = 19;             // twister, and only rattles Bob briefly
-  var SHOUTS = ['HEY!', 'BOO!', 'HA HA!', 'WOBBLE!', 'OI!'];
+  var SHOUTS = ['Muahaha!'];
 
   /* The countdown signs are timed off the spoken clip rather than off a fixed
      beat. These are the measured onsets of "Ready", "Set" and "Go!" in
@@ -822,8 +821,8 @@
 
         if (S.milestone < MILESTONES.length && S.dist >= MILESTONES[S.milestone].ft) {
           var ms = MILESTONES[S.milestone];
-          // alternate sides so consecutive badges do not land in the same place
-          S.badge = { word: ms.word, t: 0, side: (S.milestone % 2) ? 1 : -1 };
+          // alternate sides, starting on the right, so they keep clear of the palms
+          S.badge = { word: ms.word, t: 0, side: (S.milestone % 2) ? -1 : 1 };
           S.milestone++;
           Audio_.play('LevelPassed', 0.95);
           Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.7);
