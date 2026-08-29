@@ -320,6 +320,7 @@
 
   var dpr = 1;
   var trackW = 0;
+  var hudBottom = 0;
   function resize() {
     var w = el.app.clientWidth;
     var h = el.app.clientHeight;
@@ -329,6 +330,7 @@
     world.layout(w, h);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     trackW = el.meterTrack.clientWidth;
+    hudBottom = el.hud.hidden ? 0 : el.hud.getBoundingClientRect().bottom;
     fitWordmarks();
   }
 
@@ -514,6 +516,7 @@
     el.best.textContent = Math.round(S.best);
     showPanel(null);
     coach(null);
+    hudBottom = el.hud.getBoundingClientRect().bottom;
     Audio_.startMusic();
   }
 
@@ -718,7 +721,25 @@
     }
   }
 
-  function bobScreenX() { return world.w * (world.portrait ? 0.5 : 0.42); }
+  /* Dead centre, in every orientation. He tips left and right by exactly the
+     same amount, so standing him off-centre gave him noticeably less room to
+     lean one way than the other, in the one axis the whole game is about. */
+  function bobScreenX() { return world.w * 0.5; }
+
+  /* Where the countdown and milestone badges sit.
+
+     Centred in the gap between the HUD and the top of his head, so they crown
+     him rather than covering his face now that he stands underneath them. On a
+     short landscape window that gap can be smaller than the text, in which case
+     it tucks under the HUD and is allowed to overlap his head instead: his head
+     is translucent and the type is heavily outlined, so that reads fine, whereas
+     running over the score and the lean meter does not. */
+  function overlayY(size) {
+    var top = hudBottom + size * 0.5 + 8;
+    var headTop = world.groundY - world.bobHeight;
+    var ideal = (hudBottom + headTop) * 0.5;
+    return Math.max(top, Math.min(headTop - size * 0.5, ideal));
+  }
 
   function update(dt) {
     var speed = 0;
@@ -740,8 +761,9 @@
           S.milestone++;
           Audio_.play('LevelPassed', 0.95);
           Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.7);
-          fx.confetti(world.w * 0.28, world.h * 0.34, 60);
-          fx.confetti(world.w * 0.72, world.h * 0.34, 60);
+          var by = overlayY(Math.min(world.w, world.h) * 0.30);
+          fx.confetti(world.w * 0.28, by + world.h * 0.08, 60);
+          fx.confetti(world.w * 0.72, by + world.h * 0.08, 60);
         }
         if (Math.random() < dt * 0.10) { world.jumpDolphin(); }
         if (Math.random() < dt * 0.055) { Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.35); }
@@ -932,11 +954,12 @@
     var scale = 0.7 + (1 - Math.pow(1 - Math.min(1, (t - from) / 0.22), 3)) * 0.35;
     var alpha = local > 0.72 ? Math.max(0, 1 - (local - 0.72) / 0.28) : 1;
 
+    var size = Math.min(world.w * 0.17, world.h * 0.16);
+
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(world.w * 0.5, world.h * 0.30);
+    ctx.translate(world.w * 0.5, overlayY(size));
     ctx.scale(scale, scale);
-    var size = Math.min(world.w * 0.17, world.h * 0.16);
     ctx.font = '700 ' + size + 'px OpenDyslexic, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -956,7 +979,7 @@
     var out = t > 1.5 ? 1 - (t - 1.5) / 0.4 : 1;
     var size = Math.min(world.w, world.h) * 0.15;
     var x = world.w * 0.5;
-    var y = world.h * 0.24;
+    var y = overlayY(size * 2);          // the burst is twice its nominal size tall
 
     ctx.save();
     ctx.globalAlpha = Math.max(0, out);
