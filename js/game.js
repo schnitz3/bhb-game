@@ -38,8 +38,8 @@
     { ft: 2400, word: 'UNREAL!' }
   ];
 
-  var TORNADO_FROM = 220;         // feet before the first one can show up
-  var TORNADO_EVERY = 34;         // seconds between them, roughly
+  var TORNADO_MIN = 15;           // soonest a twister can arrive, in seconds
+  var TORNADO_MAX = 30;           // and the longest you will wait for one
 
   var BRAND = {
     blue: '#38b6ff', red: '#ff3131', purple: '#cb6ce6',
@@ -199,7 +199,7 @@
     noseDir: -1,
     shake: 0,
     tornado: null,
-    nextTornado: TORNADO_EVERY,
+    nextTornado: TORNADO_MIN,
     gustIn: -1,
     gustDir: 1,
     nextGust: 3,
@@ -228,6 +228,10 @@
   /* Gravity and walking pace level off, but the wind keeps getting pushier well
      past that, so a very good run still has to end somewhere. */
   function pressure() { return clamp(S.dist / PRESSURE_FEET, 0, 1.6); }
+
+  function nextTornadoIn() {
+    return TORNADO_MIN + Math.random() * (TORNADO_MAX - TORNADO_MIN);
+  }
 
   function showPanel(name) {
     Object.keys(el.panels).forEach(function (k) { el.panels[k].hidden = (k !== name); });
@@ -430,7 +434,7 @@
     S.hairVel = 0;
     S.shake = 0;
     S.tornado = null;
-    S.nextTornado = TORNADO_EVERY;
+    S.nextTornado = nextTornadoIn();
     world.setTornado(null);
     fx.clear();
   }
@@ -563,14 +567,14 @@
         world.showGust(S.gustDir);
         Audio_.play('WalkStep', 0.25, 0.6);
       }
-      // A tornado is a rarer, much bigger event than a gust: it is announced,
+      // A tornado is a bigger event than a gust: it is announced,
       // it rattles the whole screen, and it shoves him back and forth while it
       // crosses rather than landing one clean hit.
-      if (S.dist > TORNADO_FROM && !S.tornado) {
+      if (!S.tornado) {
         S.nextTornado -= dt;
         if (S.nextTornado <= 0) {
           S.tornado = { t: 0, dur: 5.0, dir: Math.random() < 0.5 ? -1 : 1 };
-          S.nextTornado = TORNADO_EVERY + Math.random() * 18;
+          S.nextTornado = nextTornadoIn();
           Audio_.play('Falling', 0.35, 0.6);
         }
       }
@@ -678,7 +682,7 @@
         var stepIdx = Math.floor(S.countdown.t / 0.62);
         if (stepIdx !== S.countdown.step && stepIdx < 3) {
           S.countdown.step = stepIdx;
-          Audio_.play('Beep', 0.35);
+          Audio_.play('Beep', 0.245);
         }
         if (S.countdown.t >= 1.86) { S.countdown = null; }
       } else {
@@ -806,10 +810,9 @@
     var arm = mag < 0.25 ? 0 : (mag < 0.5 ? 1 : (mag < 0.75 ? 2 : 3));
     var mouth;
     if (falling) { mouth = 'sad'; }
-    else if (S.mode === 'title' || S.mode === 'tutorial') { mouth = mag > 0.55 ? 'oh' : 'smile'; }
-    else if (mag < 0.34) { mouth = 'smile'; }
-    else if (mag < 0.58) { mouth = 'neutral'; }
-    else if (mag < 0.8) { mouth = 'oh'; }
+    else if (S.mode === 'title' || S.mode === 'tutorial') { mouth = mag > 0.16 ? 'oh' : 'smile'; }
+    else if (mag < 0.16) { mouth = 'smile'; }
+    else if (mag < 0.72) { mouth = 'oh'; }
     else { mouth = 'wow'; }
 
     var blinkAmt = falling ? 0 : (S.blink > 0 ? (S.blink < 1 ? S.blink : 2 - S.blink) : 0);

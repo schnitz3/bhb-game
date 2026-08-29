@@ -71,7 +71,7 @@ All the tuning lives at the top of `js/game.js`:
 | `RAMP_FEET` | distance over which gravity and pace max out |
 | `PRESSURE_FEET` | slower ramp so the wind keeps building afterwards |
 | `MILESTONES` | the distances that trigger a confetti badge |
-| `TORNADO_FROM` / `TORNADO_EVERY` | how far in the first twister can appear, and how often after that |
+| `TORNADO_MIN` / `TORNADO_MAX` | the window, in seconds, that a twister arrives within |
 
 Because damping is heavy, holding a side settles Bob's lean speed at roughly
 `PLAYER_TORQUE / DAMPING`. If you raise `PLAYER_TORQUE`, raise `DAMPING` with it
