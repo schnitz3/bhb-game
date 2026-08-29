@@ -734,11 +734,13 @@
      it tucks under the HUD and is allowed to overlap his head instead: his head
      is translucent and the type is heavily outlined, so that reads fine, whereas
      running over the score and the lean meter does not. */
-  function overlayY(size) {
-    var top = hudBottom + size * 0.5 + 8;
+  function overlayY(above, below) {
     var headTop = world.groundY - world.bobHeight;
+    var highest = hudBottom + above + 8;      // never ride up into the HUD
+    var lowest = headTop - below;             // stay off his face where possible
     var ideal = (hudBottom + headTop) * 0.5;
-    return Math.max(top, Math.min(headTop - size * 0.5, ideal));
+    // when the gap is too small for both, the HUD wins and it overlaps his head
+    return Math.max(highest, Math.min(lowest, ideal));
   }
 
   function update(dt) {
@@ -761,7 +763,8 @@
           S.milestone++;
           Audio_.play('LevelPassed', 0.95);
           Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.7);
-          var by = overlayY(Math.min(world.w, world.h) * 0.30);
+          var bh = Math.min(world.w, world.h) * 0.15 * 1.09;
+          var by = overlayY(bh, bh);
           fx.confetti(world.w * 0.28, by + world.h * 0.08, 60);
           fx.confetti(world.w * 0.72, by + world.h * 0.08, 60);
         }
@@ -954,11 +957,25 @@
     var scale = 0.7 + (1 - Math.pow(1 - Math.min(1, (t - from) / 0.22), 3)) * 0.35;
     var alpha = local > 0.72 ? Math.max(0, 1 - (local - 0.72) / 0.28) : 1;
 
-    var size = Math.min(world.w * 0.17, world.h * 0.16);
+    // 20% down from where this started, so the words clear the lean meter
+    var size = Math.min(world.w * 0.136, world.h * 0.128);
+    var stroke = size * 0.16 * 0.5;           // half the outline sits outside the glyph
+    var POP = 1.05;                           // the scale the word reaches as it lands
+
+    /* Measure the letters rather than assuming they fill the em box. In
+       OpenDyslexic the capitals reach about 0.88 of the font size above the
+       baseline, so reserving half the size left the tops of READY and GO!
+       sitting in the HUD. */
+    if (!_probe) { _probe = document.createElement('canvas').getContext('2d'); }
+    _probe.font = '700 ' + size + 'px OpenDyslexic, sans-serif';
+    _probe.textBaseline = 'middle';
+    var tm = _probe.measureText(COUNT_WORDS[i].word);
+    var above = (tm.actualBoundingBoxAscent + stroke) * POP;
+    var below = (tm.actualBoundingBoxDescent + stroke) * POP;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(world.w * 0.5, overlayY(size));
+    ctx.translate(world.w * 0.5, overlayY(above, below));
     ctx.scale(scale, scale);
     ctx.font = '700 ' + size + 'px OpenDyslexic, sans-serif';
     ctx.textAlign = 'center';
@@ -979,7 +996,9 @@
     var out = t > 1.5 ? 1 - (t - 1.5) / 0.4 : 1;
     var size = Math.min(world.w, world.h) * 0.15;
     var x = world.w * 0.5;
-    var y = overlayY(size * 2);          // the burst is twice its nominal size tall
+    // the burst's spikes reach 1.05 of its nominal size, plus its own outline
+    var half = size * 1.05 + size * 0.04;
+    var y = overlayY(half, half);
 
     ctx.save();
     ctx.globalAlpha = Math.max(0, out);
