@@ -41,6 +41,10 @@
   var TORNADO_MIN = 15;           // soonest a twister can arrive, in seconds
   var TORNADO_MAX = 30;           // and the longest you will wait for one
 
+  var SHOUT_MIN = 9;              // the Evil Blob turns up more often than a
+  var SHOUT_MAX = 19;             // twister, and only rattles Bob briefly
+  var SHOUTS = ['HEY!', 'BOO!', 'HA HA!', 'WOBBLE!', 'OI!'];
+
   /* The countdown signs are timed off the spoken clip rather than off a fixed
      beat. These are the measured onsets of "Ready", "Set" and "Go!" in
      assets/audio/ReadySetGo.m4a; re-measure them if that recording is replaced. */
@@ -227,6 +231,9 @@
     shake: 0,
     tornado: null,
     nextTornado: TORNADO_MIN,
+    shout: null,
+    nextShout: SHOUT_MIN,
+    beatBest: false,
     gustIn: -1,
     gustDir: 1,
     nextGust: 3,
@@ -258,6 +265,10 @@
 
   function nextTornadoIn() {
     return TORNADO_MIN + Math.random() * (TORNADO_MAX - TORNADO_MIN);
+  }
+
+  function nextShoutIn() {
+    return SHOUT_MIN + Math.random() * (SHOUT_MAX - SHOUT_MIN);
   }
 
   function showPanel(name) {
@@ -483,7 +494,11 @@
     S.shake = 0;
     S.tornado = null;
     S.nextTornado = nextTornadoIn();
+    S.shout = null;
+    S.nextShout = nextShoutIn();
+    S.beatBest = false;
     world.setTornado(null);
+    world.setShout(null);
     fx.clear();
   }
 
@@ -649,6 +664,33 @@
         if (S.tornado.t >= S.tornado.dur) { S.tornado = null; world.setTornado(null); }
       }
 
+      /* The Evil Blob pops up at the edge and yells. It is a smaller event than
+         a gust: a short rattle rather than a shove, so it is a nuisance to play
+         through rather than something that ends a run on its own. */
+      if (!S.shout && world.hasBlob()) {
+        S.nextShout -= dt;
+        if (S.nextShout <= 0) {
+          S.shout = {
+            t: 0, dur: 2.4,
+            side: Math.random() < 0.5 ? -1 : 1,
+            word: SHOUTS[(Math.random() * SHOUTS.length) | 0]
+          };
+          S.nextShout = nextShoutIn();
+          Audio_.play('Laugh', 0.5);
+        }
+      }
+      if (S.shout) {
+        S.shout.t += dt;
+        var sp = S.shout.t / S.shout.dur;
+        world.setShout({ p: sp, side: S.shout.side, word: S.shout.word });
+        if (sp > 0.28 && sp < 0.62) {
+          var rattle = Math.sin(S.shout.t * 26) * 1.1;
+          torque += rattle;
+          S.shake = Math.max(S.shake, 0.28);
+        }
+        if (S.shout.t >= S.shout.dur) { S.shout = null; world.setShout(null); }
+      }
+
       if (S.gustIn >= 0) {
         S.gustIn -= dt;
         if (S.gustIn <= 0) {
@@ -767,9 +809,21 @@
         S.dist += speed * dt;
         el.score.textContent = Math.round(S.dist);
 
+        // passing your own record deserves more than the number ticking over
+        if (!S.beatBest && S.best > 0 && S.dist > S.best) {
+          S.beatBest = true;
+          S.badge = { word: 'NEW BEST!', t: 0, side: 0, big: true };
+          Audio_.play('LevelPassed', 1);
+          Audio_.play('Weee', 0.8);
+          for (var c = 0; c < 5; c++) {
+            fx.confetti(world.w * (0.12 + c * 0.19), world.h * 0.2, 46);
+          }
+        }
+
         if (S.milestone < MILESTONES.length && S.dist >= MILESTONES[S.milestone].ft) {
           var ms = MILESTONES[S.milestone];
-          S.badge = { word: ms.word, t: 0 };
+          // alternate sides so consecutive badges do not land in the same place
+          S.badge = { word: ms.word, t: 0, side: (S.milestone % 2) ? 1 : -1 };
           S.milestone++;
           Audio_.play('LevelPassed', 0.95);
           Audio_.play(Math.random() < 0.5 ? 'Laugh' : 'Weee', 0.7);
@@ -842,7 +896,7 @@
 
     if (S.badge) {
       S.badge.t += dt;
-      if (S.badge.t > 1.9) { S.badge = null; }
+      if (S.badge.t > (S.badge.big ? 2.6 : 1.9)) { S.badge = null; }
     }
 
     world.update(dt, speed * 11);
@@ -1003,12 +1057,24 @@
     if (!S.badge) { return; }
     var t = S.badge.t;
     var pop = t < 0.22 ? t / 0.22 : 1;
-    var out = t > 1.5 ? 1 - (t - 1.5) / 0.4 : 1;
-    var size = Math.min(world.w, world.h) * 0.15;
-    var x = world.w * 0.5;
+    var fadeAt = S.badge.big ? 2.2 : 1.5;
+    var out = t > fadeAt ? 1 - (t - fadeAt) / 0.4 : 1;
+    var grow = S.badge.big ? 1.25 : 1;
+    var size = Math.min(world.w, world.h) * 0.15 * grow;
     // the burst's spikes reach 1.05 of its nominal size, plus its own outline
     var half = size * 1.05 + size * 0.04;
+    var x = world.w * 0.5;
     var y = overlayY(half, half);
+
+    /* On a wide screen there is open beach either side of Bob, so the badge goes
+       out there and alternates sides rather than landing on his face. A phone
+       has no such room, so it stays above his head. NEW BEST! always centres,
+       because it is the one worth stopping for. */
+    if (!world.portrait && S.badge.side) {
+      var margin = half * 1.55 + 10;              // the spikes run wider than tall
+      x = S.badge.side < 0 ? margin : world.w - margin;
+      y = Math.max(hudBottom + half + 8, world.h * 0.40);
+    }
 
     ctx.save();
     ctx.globalAlpha = Math.max(0, out);

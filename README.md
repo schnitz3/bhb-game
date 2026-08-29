@@ -73,6 +73,8 @@ All the tuning lives at the top of `js/game.js`:
 | `MILESTONES` | the distances that trigger a confetti badge |
 | `COUNT_WORDS` / `COUNT_END` | when each countdown sign appears, measured off the voice clip |
 | `TORNADO_MIN` / `TORNADO_MAX` | the window, in seconds, that a twister arrives within |
+| `SHOUT_MIN` / `SHOUT_MAX` | the window the Evil Blob pops up in |
+| `SHOUTS` | what he yells |
 
 Because damping is heavy, holding a side settles Bob's lean speed at roughly
 `PLAYER_TORQUE / DAMPING`. If you raise `PLAYER_TORQUE`, raise `DAMPING` with it
@@ -102,7 +104,7 @@ js/world.js     the beach, drawn in code so it fits any screen shape
 js/game.js      physics, input, the practice run and game flow
 sw.js           offline cache
 assets/bob/     Bob's parts plus rig.json, which holds their positions
-assets/img/     palm tree, dolphin
+assets/img/     palm tree, dolphin, the Evil Blob
 assets/audio/   sound effects, the Ready Set Go voice clip and the music
 ```
 

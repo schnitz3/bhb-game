@@ -29,6 +29,8 @@
     this.gust = 0;
     this.gustDir = 0;
     this.twister = null;
+    this.blob = null;
+    this.shout = null;
   }
 
   World.prototype.loadArt = function (baseUrl, onStep) {
@@ -41,6 +43,10 @@
         im.src = baseUrl + src;
       });
     }
+    // The villain is comparatively heavy and only turns up occasionally, so he
+    // loads in the background: until he arrives, shouts simply are not scheduled.
+    img('evilblob.png').then(function (b) { self.blob = b; }, function () {});
+
     return Promise.all([img('palm.png'), img('dolphin.png')]).then(function (r) {
       self.palm = r[0];
       self.dolphin = r[1];
@@ -124,6 +130,10 @@
 
   World.prototype.setTornado = function (info) { this.twister = info; };
 
+  World.prototype.setShout = function (info) { this.shout = info; };
+
+  World.prototype.hasBlob = function () { return !!this.blob; };
+
   World.prototype.showGust = function (dir) {
     this.gust = 1;
     this.gustDir = dir;
@@ -156,8 +166,74 @@
     if (this.twister) { this._twister(ctx); }
     this._palms(ctx);
     this._sandDetail(ctx);
+    if (this.shout) { this._shouter(ctx); }
     if (this.gust > 0.01) { this._wind(ctx); }
     return true;
+  };
+
+  /* The Evil Blob pops up at the edge of the beach, yells, and ducks away.
+     Drawn at the sides rather than behind Bob so he never sits under the
+     translucent head. */
+  World.prototype._shouter = function (ctx) {
+    if (!this.blob) { return; }
+    var S = this.shout;
+    var p = Math.max(0, Math.min(1, S.p));
+    // up quickly, hold, then drop
+    var pop = p < 0.18 ? p / 0.18 : (p > 0.82 ? (1 - p) / 0.18 : 1);
+    pop = Math.max(0, Math.min(1, pop));
+    if (pop <= 0.001) { return; }
+
+    var size = Math.min(this.w, this.h) * 0.24;
+    var ar = this.blob.height / this.blob.width;
+    var bw = size / ar * 1.0;
+    var bh = size;
+    var x = this.w * (S.side < 0 ? 0.16 : 0.84);
+    var footY = this.groundY + (this.h - this.groundY) * 0.28;
+    var y = footY - bh * pop;
+
+    ctx.save();
+    // a wobble while he is yelling
+    var shake = (p > 0.25 && p < 0.7) ? Math.sin(this.t * 34) * bw * 0.02 : 0;
+    ctx.translate(x + shake, y);
+    if (S.side > 0) { ctx.scale(-1, 1); }
+    ctx.drawImage(this.blob, -bw * 0.5, 0, bw, bh);
+    ctx.restore();
+
+    if (p > 0.2 && p < 0.78) { this._shoutBubble(ctx, x, y, bw, S); }
+  };
+
+  World.prototype._shoutBubble = function (ctx, x, y, bw, S) {
+    var size = bw * 0.34;
+    var bx = x + (S.side < 0 ? bw * 0.62 : -bw * 0.62);
+    var by = y + size * 0.2;
+    var wobble = 1 + Math.sin(this.t * 18) * 0.04;
+
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.scale(wobble, wobble);
+
+    ctx.beginPath();
+    var spikes = 11;
+    for (var i = 0; i < spikes * 2; i++) {
+      var r = size * (i % 2 ? 0.74 : 1.06);
+      var a = (i / (spikes * 2)) * TAU - Math.PI / 2;
+      var px = Math.cos(a) * r * 1.5;
+      var py = Math.sin(a) * r * 0.86;
+      if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, size * 0.09);
+    ctx.strokeStyle = '#123a5c';
+    ctx.stroke();
+
+    ctx.font = '700 ' + (size * 0.62) + 'px OpenDyslexic, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff3131';
+    ctx.fillText(S.word, 0, size * 0.02);
+    ctx.restore();
   };
 
   /* The twister.
@@ -520,6 +596,18 @@
     }
     ctx.globalAlpha = 1;
 
+    // sandcastles, spaced well apart so they read as a find rather than scenery
+    var cspan = this.w * 3.2;
+    for (var c = 0; c < 2; c++) {
+      var cs = hash(c * 21.7 + 9);
+      var cx = ((c * cspan / 2 + cs * cspan * 0.6) - this.scroll * 0.72) % cspan;
+      if (cx < -200) { cx += cspan; }
+      var csize = base * 0.075 * (0.8 + cs * 0.5);
+      if (cx > -csize * 2 && cx < this.w + csize * 2) {
+        this._sandcastle(ctx, cx, this.sandY + (this.groundY - this.sandY) * (0.5 + cs * 0.22), csize, cs);
+      }
+    }
+
     // grass tufts in the very front, moving at full speed to sell the walk
     var tufts = 9;
     var tspan = this.w * 1.25;
@@ -531,6 +619,70 @@
       var ty = this.h - (this.h - this.groundY) * (0.05 + s2 * 0.45);
       this._tuft(ctx, tx, ty, base * 0.028 * (0.7 + s2 * 0.8), s2);
     }
+  };
+
+  World.prototype._sandcastle = function (ctx, x, y, u, seed) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(150,116,58,0.55)';
+    ctx.lineWidth = Math.max(1, u * 0.06);
+    ctx.lineJoin = 'round';
+
+    function tower(tx, tw, th, merlons) {
+      var g = ctx.createLinearGradient(tx - tw / 2, -th, tx + tw / 2, 0);
+      g.addColorStop(0, '#f0d69a');
+      g.addColorStop(1, '#d9b273');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(tx - tw / 2, 0);
+      ctx.lineTo(tx - tw / 2, -th);
+      // crenellated top
+      var step = tw / (merlons * 2 - 1);
+      for (var i = 0; i < merlons * 2 - 1; i++) {
+        var px = tx - tw / 2 + step * i;
+        var up = (i % 2 === 0) ? -th - step * 0.7 : -th;
+        ctx.lineTo(px, up);
+        ctx.lineTo(px + step, up);
+      }
+      ctx.lineTo(tx + tw / 2, -th);
+      ctx.lineTo(tx + tw / 2, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    tower(-u * 0.9, u * 0.7, u * 1.15, 3);
+    tower(u * 0.9, u * 0.7, u * 1.15, 3);
+    tower(0, u * 1.15, u * 1.6, 4);
+
+    // doorway
+    ctx.fillStyle = 'rgba(122,92,48,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.2, 0);
+    ctx.lineTo(-u * 0.2, -u * 0.42);
+    ctx.quadraticCurveTo(0, -u * 0.66, u * 0.2, -u * 0.42);
+    ctx.lineTo(u * 0.2, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // flag, fluttering with the same wind that pushes the palms
+    var flag = u * 0.5;
+    var sway = Math.sin(this.t * 3 + seed * 6) * 0.12 + this.gust * this.gustDir * 0.2;
+    ctx.strokeStyle = '#123a5c';
+    ctx.lineWidth = Math.max(1, u * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(0, -u * 1.6 - u * 0.28);
+    ctx.lineTo(0, -u * 1.6 - u * 0.28 - flag);
+    ctx.stroke();
+    ctx.fillStyle = seed > 0.5 ? '#ff3131' : '#ff66c4';
+    ctx.beginPath();
+    var fy = -u * 1.6 - u * 0.28 - flag;
+    ctx.moveTo(0, fy);
+    ctx.quadraticCurveTo(flag * 0.55, fy + flag * (0.16 + sway), flag * 0.9, fy + flag * 0.06);
+    ctx.lineTo(0, fy + flag * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   };
 
   World.prototype._tuft = function (ctx, x, y, size, seed) {

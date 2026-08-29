@@ -65,6 +65,11 @@ html, body {
   display: block;
 }
 
+/* Nothing on the playfield is aimed at, so the pointer just sits on top of Bob.
+   It comes back over the HUD buttons and on every menu. */
+#app.playing #stage,
+#app.playing .zone { cursor: none; }
+
 /* ---------------------------------------------------------------- hold zones */
 
 .zone {
@@ -116,13 +121,15 @@ html, body {
   bottom: calc(var(--safe-b) + clamp(8px, 2.4vh, 26px));
   transform: translateX(-50%);
   z-index: 4;
-  max-width: min(94vw, 620px);
-  padding: clamp(5px, 1.2vmin, 10px) clamp(12px, 3vw, 24px);
+  /* hug the words: the break is explicit, so max-content is the longest line
+     rather than the whole sentence */
+  width: max-content;
+  max-width: min(92vw, 460px);
+  padding: clamp(6px, 1.4vmin, 11px) clamp(14px, 2.4vw, 22px);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
   text-align: center;
-  text-wrap: balance;
   font-size: clamp(11px, 1.9vmin, 16px);
   font-weight: 700;
   line-height: 1.35;
