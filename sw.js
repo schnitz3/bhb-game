@@ -7,7 +7,7 @@
  *     served from the cache first and the network is only a fallback.
  * Bump CACHE when you rename or remove an asset.
  */
-var CACHE = 'bhb-game-v5';
+var CACHE = 'bhb-game-v6';
 
 var CORE = [
   './', './index.html', './styles.css', './manifest.webmanifest',

@@ -192,6 +192,7 @@
       load: $('panelLoad'),
       title: $('panelTitle'),
       how: $('panelHow'),
+      share: $('panelShare'),
       dedication: $('panelDedication'),
       pause: $('panelPause'),
       over: $('panelOver')
@@ -1194,19 +1195,107 @@
     }
   });
 
+  /* Sharing, with a fallback at every step.
+
+     navigator.share exists on desktop Chrome and on mobile, so the old code
+     always took that branch, and its catch was empty: any rejection left the
+     button looking dead. It rejects routinely, most obviously inside a
+     cross-origin iframe, which needs allow="web-share" to use it at all.
+     Now every failure falls through to the next option, and the last one is a
+     panel with the text on screen, which cannot fail. */
+
+  function shareLine() {
+    var feet = Math.round(S.dist);
+    return 'I walked ' + feet + ' ft in Balance Big Head Bob! Balance. Breathe. Be your best.';
+  }
+
+  function shareUrl() { return location.href.split('#')[0].split('?')[0]; }
+
+  function showSharePanel(payload) {
+    var box = $('shareText');
+    box.value = payload;
+    showPanel('share');
+    // preselect so one keypress copies it
+    setTimeout(function () {
+      try { box.focus(); box.select(); box.setSelectionRange(0, payload.length); } catch (e) { }
+    }, 60);
+  }
+
+  /* Older copy path. Works in places the async clipboard API is blocked,
+     including some embedded frames. */
+  function legacyCopy(payload) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = payload;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, payload.length);
+      var ok = document.execCommand && document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) { return false; }
+  }
+
+  function copyOrShow(payload) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(payload).then(function () {
+        toast('Score copied. Paste it anywhere!');
+      }, function () {
+        if (legacyCopy(payload)) { toast('Score copied. Paste it anywhere!'); }
+        else { showSharePanel(payload); }
+      });
+      return;
+    }
+    if (legacyCopy(payload)) { toast('Score copied. Paste it anywhere!'); }
+    else { showSharePanel(payload); }
+  }
+
   $('btnShare').addEventListener('click', function () {
     Audio_.play('ButtonClick');
-    var feet = Math.round(S.dist);
-    var text = 'I walked ' + feet + ' ft in Balance Big Head Bob! Balance. Breathe. Be your best.';
-    var url = location.href.split('#')[0];
-    if (navigator.share) {
-      navigator.share({ title: 'Balance Big Head Bob', text: text, url: url })
-        .catch(function () { /* dismissed */ });
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text + ' ' + url)
-        .then(function () { toast('Score copied. Paste it anywhere!'); })
-        .catch(function () { toast(text); });
-    } else { toast(text); }
+    var text = shareLine();
+    var url = shareUrl();
+    var payload = text + ' ' + url;
+
+    var data = { title: 'Balance Big Head Bob', text: text, url: url };
+    var shareable = !navigator.canShare || navigator.canShare(data);
+
+    if (navigator.share && shareable) {
+      var attempt;
+      try { attempt = navigator.share(data); } catch (e) { attempt = null; }
+      if (attempt && attempt.then) {
+        attempt.then(null, function (err) {
+          // closing the share sheet is not a failure worth reacting to
+          if (err && err.name === 'AbortError') { return; }
+          copyOrShow(payload);
+        });
+        return;
+      }
+    }
+    copyOrShow(payload);
+  });
+
+  $('btnShareCopy').addEventListener('click', function () {
+    Audio_.play('ButtonClick');
+    var payload = $('shareText').value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(payload).then(function () {
+        toast('Score copied. Paste it anywhere!');
+      }, function () {
+        if (!legacyCopy(payload)) { toast('Select the text above and copy it.'); }
+        else { toast('Score copied. Paste it anywhere!'); }
+      });
+    } else if (legacyCopy(payload)) {
+      toast('Score copied. Paste it anywhere!');
+    } else {
+      toast('Select the text above and copy it.');
+    }
+  });
+
+  $('btnShareBack').addEventListener('click', function () {
+    Audio_.play('ButtonClick');
+    showPanel('over');
   });
 
   // ------------------------------------------------------------------ boot

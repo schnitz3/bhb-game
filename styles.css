@@ -483,6 +483,22 @@ html, body {
   text-align: center;
 }
 
+.share-hint { margin: 0 0 12px; font-size: clamp(12px, 2vmin, 16px); color: var(--ink-soft); }
+
+.share-box {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #eef5fb;
+  box-shadow: inset 0 0 0 2px #d3e6f5;
+  font-family: inherit;
+  font-size: clamp(12px, 1.9vmin, 15px);
+  color: var(--ink);
+  text-align: center;
+}
+#panelShare h2 { text-align: center; }
+
 /* ------------------------------------------------------------- dedication */
 
 .text-links {
