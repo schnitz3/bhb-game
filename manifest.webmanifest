@@ -1,0 +1,17 @@
+{
+  "name": "Balance Big Head Bob",
+  "short_name": "Balance Bob",
+  "description": "Keep Big Head Bob upright as he strolls the beach. Balance. Breathe. Be your best.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#38b6ff",
+  "theme_color": "#38b6ff",
+  "categories": ["games", "kids", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
