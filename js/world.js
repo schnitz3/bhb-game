@@ -146,6 +146,7 @@
 
     this._sun(ctx);
     this._sea(ctx);
+    this._waves(ctx);
     this._dolphin(ctx);
     this._clouds(ctx);
     this._boats(ctx);
@@ -297,6 +298,42 @@
       ctx.beginPath();
       ctx.moveTo(drift, y);
       ctx.lineTo(drift + len, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  /* Swells rolling toward the beach. Each crest starts near the horizon, travels
+     down the water band, brightens and thickens as it gets closer, then dissolves
+     into the foam at the sand line. */
+  World.prototype._waves = function (ctx) {
+    var crests = 5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, this.horizonY, this.w, this.seaH);
+    ctx.clip();
+    ctx.lineCap = 'round';
+
+    for (var i = 0; i < crests; i++) {
+      var seed = hash(i * 9.13 + 4);
+      var phase = ((this.t * 0.13) + i / crests + seed * 0.12) % 1;
+      // ease the crest so it lingers offshore and then runs in
+      var d = phase * phase;
+      var y = this.horizonY + this.seaH * (0.2 + d * 0.86);
+      var strength = Math.sin(phase * Math.PI);
+      if (strength <= 0.02) { continue; }
+
+      ctx.globalAlpha = strength * (0.22 + d * 0.55);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1, this.seaH * (0.02 + d * 0.075));
+
+      var amp = this.seaH * 0.035 * (0.4 + d);
+      var wl = this.w / (2.2 + seed * 2);
+      ctx.beginPath();
+      for (var x = -20; x <= this.w + 20; x += 14) {
+        var yy = y + Math.sin((x / wl) * Math.PI * 2 + this.t * 1.4 + i) * amp;
+        if (x === -20) { ctx.moveTo(x, yy); } else { ctx.lineTo(x, yy); }
+      }
       ctx.stroke();
     }
     ctx.restore();

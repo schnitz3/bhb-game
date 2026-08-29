@@ -196,6 +196,7 @@
     headVel: 0,
     hairAngle: 0,
     hairVel: 0,
+    noseDir: -1,
     shake: 0,
     tornado: null,
     nextTornado: TORNADO_EVERY,
@@ -721,6 +722,11 @@
       speed = SPEED_MIN * 0.35;
     }
 
+    // He turns his head toward the side you are holding. The nose keeps its last
+    // direction when you let go, so it does not flicker while he coasts.
+    if (input.left) { S.noseDir = -1; }
+    else if (input.right) { S.noseDir = 1; }
+
     // legs only cycle while he is actually walking
     if (S.mode === 'play' && !S.countdown) { S.walkPhase = (S.walkPhase + dt * 1.75) % 1; }
     else if (S.mode === 'tutorial' || S.mode === 'title') { S.walkPhase = (S.walkPhase + dt * 1.1) % 1; }
@@ -785,7 +791,9 @@
     // the coach line only shouts when it matters, so it stays meaningful
     if (S.mode === 'play' && !S.countdown) {
       if (urgent) { coach(S.angle > 0 ? '◀  HOLD LEFT' : 'HOLD RIGHT  ▶', true); }
-      else if (S.gustIn >= 0) { coach(S.gustDir > 0 ? 'Gust coming from the left!' : 'Gust coming from the right!'); }
+      else if (S.gustIn >= 0 && !S.badge) {
+        coach(S.gustDir > 0 ? 'Gust coming from the left!' : 'Gust coming from the right!');
+      }
       else { coach(null); }
     }
   }
@@ -840,6 +848,7 @@
       mouth: mouth,
       blink: blinkAmt,
       brow: falling ? 1 : mag,
+      nose: S.noseDir,
       lookX: falling ? 0 : clamp(S.angle / FALL_ANGLE, -1, 1),
       lookY: falling ? 0.5 : 0,
       squash: 1 + (S.mode === 'play' && !S.countdown ? Math.sin(S.walkPhase * Math.PI * 4) * 0.006 : 0)
@@ -919,9 +928,18 @@
     ctx.strokeStyle = BRAND.ink;
     ctx.stroke();
 
-    ctx.font = '700 ' + (size * 0.46) + 'px OpenDyslexic, sans-serif';
+    // longer words like RESPECT! overflowed the burst at a fixed size, so shrink
+    // the type until it sits inside the spikes
+    var inner = size * 1.85;
+    var fs = size * 0.46;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = '700 ' + fs + 'px OpenDyslexic, sans-serif';
+    var guard = 0;
+    while (ctx.measureText(S.badge.word).width > inner && fs > 6 && guard++ < 60) {
+      fs *= 0.93;
+      ctx.font = '700 ' + fs + 'px OpenDyslexic, sans-serif';
+    }
     ctx.fillStyle = '#fff3a8';
     ctx.fillText(S.badge.word, 0, size * 0.02);
     ctx.restore();

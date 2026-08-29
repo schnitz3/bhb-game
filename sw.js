@@ -7,7 +7,7 @@
  *     served from the cache first and the network is only a fallback.
  * Bump CACHE when you rename or remove an asset.
  */
-var CACHE = 'bhb-game-v2';
+var CACHE = 'bhb-game-v3';
 
 var CORE = [
   './', './index.html', './styles.css', './manifest.webmanifest',
@@ -19,7 +19,7 @@ var CORE = [
   './assets/bob/rig.json'
 ];
 
-['face', 'hair', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR', 'browL', 'browR',
+['face', 'hair', 'nose', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR', 'browL', 'browR',
  'mouthSmile', 'mouthNeutral', 'mouthOh', 'mouthWow', 'mouthSad',
  'torso', 'legL', 'legR', 'armL0', 'armL1', 'armL2', 'armL3',
  'armR0', 'armR1', 'armR2', 'armR3'].forEach(function (n) {

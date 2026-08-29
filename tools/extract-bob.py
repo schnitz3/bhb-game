@@ -128,8 +128,10 @@ if __name__ == "__main__":
     P = lambda *paths: list(paths)
 
     # ---- head, broken into independently animatable pieces ----
-    save_part(P(HEAD + "/Face bg/" + FACE, HEAD + "/Nose/nose"),
-              "face", out_dir, scale, manifest)
+    save_part(P(HEAD + "/Face bg/" + FACE), "face", out_dir, scale, manifest)
+    # the nose is separate so it can be mirrored across the face, which reads as
+    # Bob turning his head toward the side you are holding
+    save_part(P(HEAD + "/Nose/nose"), "nose", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Hair"), "hair", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Left Eye/Left Eyeball"), "eyeL", out_dir, scale, manifest)
     save_part(P(HEAD + "/+Right Eye/Right Eyeball"), "eyeR", out_dir, scale, manifest)

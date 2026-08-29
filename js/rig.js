@@ -9,7 +9,7 @@
   'use strict';
 
   var PARTS = [
-    'face', 'hair', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR',
+    'face', 'hair', 'nose', 'eyeL', 'eyeR', 'pupilL', 'pupilR', 'blinkL', 'blinkR',
     'browL', 'browR',
     'mouthSmile', 'mouthNeutral', 'mouthOh', 'mouthWow', 'mouthSad',
     'torso', 'legL', 'legR',
@@ -84,6 +84,9 @@
     this.shoulderL = { x: m.armL0.x + 2, y: m.armL0.y + 6 };
     this.shoulderR = { x: m.armR0.x + m.armR0.w - 2, y: m.armR0.y + 6 };
 
+    // the nose is drawn off-centre; mirroring it across this line turns his head
+    this.faceCx = face.x + face.w * 0.5;
+
     this.topY = Math.min(face.y, hair.y, torso.y);
     this.rigHeight = this.feetY - this.topY;
     this.headWidth = face.w;
@@ -114,6 +117,7 @@
    *   mouth       'smile' | 'neutral' | 'oh' | 'wow' | 'sad'
    *   blink       0..1, how closed the eyes are
    *   lookX/lookY -1..1 pupil drift
+   *   nose        >0 mirrors the nose across the face, turning his head
    *   squash      1 = normal, >1 stretches him taller
    *   alpha       0..1
    */
@@ -150,17 +154,20 @@
       self._blit(ctx, 'legR');
     });
 
-    // --- arms, tucked under the jacket at the shoulder ---
+    // --- arms ---
+    // The far arm tucks under the jacket and the near one sits over it. That
+    // asymmetry is what stops him reading as a flat, dead-on cut-out.
     var aL = Math.max(0, Math.min(3, Math.round(pose.armL || 0)));
     var aR = Math.max(0, Math.min(3, Math.round(pose.armR || 0)));
     this._rotateAbout(ctx, this.shoulderL, -swing * 0.12, function () {
       self._blit(ctx, 'armL' + aL);
     });
+
+    this._blit(ctx, 'torso');
+
     this._rotateAbout(ctx, this.shoulderR, swing * 0.12, function () {
       self._blit(ctx, 'armR' + aR);
     });
-
-    this._blit(ctx, 'torso');
 
     // --- head, hinged at the neck so it lags behind the body ---
     this._rotateAbout(ctx, this.neck, pose.headTilt || 0, function () {
@@ -180,7 +187,21 @@
   };
 
   BobRig.prototype._drawFace = function (ctx, pose, dy) {
+    var self = this;
     var blink = Math.max(0, Math.min(1, pose.blink || 0));
+
+    // Mirroring the nose across the centre of the face both flips the curve and
+    // moves it to the other side, which reads as his head turning that way.
+    if (pose.nose > 0) {
+      ctx.save();
+      ctx.translate(this.faceCx, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-this.faceCx, 0);
+      this._blit(ctx, 'nose', 0, dy);
+      ctx.restore();
+    } else {
+      this._blit(ctx, 'nose', 0, dy);
+    }
     var lookX = Math.max(-1, Math.min(1, pose.lookX || 0)) * 13;
     var lookY = Math.max(-1, Math.min(1, pose.lookY || 0)) * 9;
 
@@ -214,11 +235,11 @@
     ctx.save();
     ctx.translate(0, dy);
     this._rotateAbout(ctx, { x: bl.x + bl.w, y: bl.y }, worry * 0.42, function () {
-      ctx.drawImage(this.img.browL, bl.x, bl.y + worry * 22, bl.w, bl.h);
-    }.bind(this));
+      ctx.drawImage(self.img.browL, bl.x, bl.y + worry * 22, bl.w, bl.h);
+    });
     this._rotateAbout(ctx, { x: br.x, y: br.y }, -worry * 0.42, function () {
-      ctx.drawImage(this.img.browR, br.x, br.y + worry * 22, br.w, br.h);
-    }.bind(this));
+      ctx.drawImage(self.img.browR, br.x, br.y + worry * 22, br.w, br.h);
+    });
     ctx.restore();
 
     this._blit(ctx, MOUTHS[pose.mouth] || 'mouthSmile', 0, dy);
