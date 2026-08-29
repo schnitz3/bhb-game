@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Balance Big Head Bob</title>
+<meta name="description" content="Keep Big Head Bob upright as he strolls the beach. A free one-thumb balancing game for phones, tablets and desktop. Balance. Breathe. Be your best.">
+<meta name="theme-color" content="#38b6ff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Balance Bob">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Balance Big Head Bob">
+<meta property="og:description" content="How far can you keep Bob on his feet? Balance. Breathe. Be your best.">
+<meta property="og:url" content="https://schnitz3.github.io/bhb-game/">
+<meta property="og:image" content="https://schnitz3.github.io/bhb-game/icons/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Balance Big Head Bob">
+<meta name="twitter:description" content="How far can you keep Bob on his feet? Balance. Breathe. Be your best.">
+<meta name="twitter:image" content="https://schnitz3.github.io/bhb-game/icons/og-card.png">
+
+<link rel="icon" href="favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+  <canvas id="stage" aria-label="Big Head Bob balancing on the beach"></canvas>
+
+  <!-- Hold zones. Pointer targets only; the visible coaching marks are drawn inside. -->
+  <div id="zoneL" class="zone" aria-hidden="true"><span class="zone-arrow">◀</span><span class="zone-word">HOLD</span></div>
+  <div id="zoneR" class="zone" aria-hidden="true"><span class="zone-arrow">▶</span><span class="zone-word">HOLD</span></div>
+
+  <!-- One line covering both controls, shown across the countdown. -->
+  <div id="controlsHint" aria-hidden="true">
+    <span class="hint-keys">Hold left or right arrows<br>or either side of the screen</span>
+    <span class="hint-touch">Hold either side of the screen</span>
+  </div>
+
+  <header id="hud" hidden>
+    <div class="hud-scores">
+      <div class="stat"><span class="stat-label">Distance</span><span class="stat-value" id="score">0</span><span class="stat-unit">ft</span></div>
+      <div class="stat stat-best"><span class="stat-label">Best</span><span class="stat-value" id="best">0</span><span class="stat-unit">ft</span></div>
+    </div>
+
+    <div id="meter" role="img" aria-label="How far Bob is leaning">
+      <div class="meter-track">
+        <div class="meter-centre"></div>
+        <div class="meter-needle" id="needle"></div>
+      </div>
+      <div class="meter-caption" id="meterCaption">Steady</div>
+    </div>
+
+    <div class="hud-buttons">
+      <button id="btnSound" class="icon-btn" type="button" aria-label="Mute sound" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9v6h4l5 4V5L8 9H4z"/><g class="waves"><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></g><g class="slash"><path d="M16 9l6 6M22 9l-6 6"/></g></svg>
+      </button>
+      <button id="btnPause" class="icon-btn" type="button" aria-label="Pause game">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button id="btnFull" class="icon-btn" type="button" aria-label="Toggle full screen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Coach line: the single most important instruction, always in plain words. -->
+  <div id="coach" hidden><span id="coachText"></span></div>
+
+  <div id="overlay">
+
+    <section class="panel" id="panelLoad">
+      <div class="loader-bob" aria-hidden="true"></div>
+      <h1 class="wordmark"><span>Balance</span><em>Big Head Bob</em></h1>
+      <div class="bar"><div class="bar-fill" id="loadBar"></div></div>
+      <p class="loading-note">Warming up the beach…</p>
+    </section>
+
+    <section class="panel" id="panelTitle" hidden>
+      <h1 class="wordmark"><span>Balance</span><em>Big Head Bob</em></h1>
+      <p class="tagline">Balance. Breathe. Be your best.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnPlay" type="button">Play</button>
+        <button class="btn btn-ghost" id="btnHow" type="button">How to play</button>
+      </div>
+      <p class="best-line" id="titleBest" hidden>Your best walk: <strong></strong> ft</p>
+      <p class="hint-line" id="titleHint"></p>
+    </section>
+
+    <section class="panel panel-wide" id="panelHow" hidden>
+      <h2>How to play</h2>
+      <ol class="steps">
+        <li><span class="step-n">1</span><span>Bob's head is <strong>enormous</strong>. He tips over easily.</span></li>
+        <li><span class="step-n">2</span><span>When he leans <strong>right</strong>, hold the <strong>left</strong> side of the screen. When he leans <strong>left</strong>, hold the <strong>right</strong>.</span></li>
+        <li><span class="step-n">3</span><span>Watch the meter at the top. Green is safe, red means he is about to fall.</span></li>
+        <li><span class="step-n">4</span><span>Let go once he is upright, or you will tip him the other way.</span></li>
+      </ol>
+      <p class="keys-line">On a computer use the <kbd>←</kbd> and <kbd>→</kbd> arrow keys, or <kbd>A</kbd> and <kbd>D</kbd>. <kbd>Space</kbd> starts a walk, <kbd>P</kbd> pauses, <kbd>M</kbd> mutes.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnTutorial" type="button">Try the practice run</button>
+        <button class="btn btn-ghost" id="btnHowBack" type="button">Back</button>
+      </div>
+      <div class="text-links">
+        <button class="btn btn-text" id="btnTilt" type="button" aria-pressed="false">Use tilt controls</button>
+        <button class="btn btn-text" id="btnDedication" type="button">Dedication</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panelDedication" hidden>
+      <p class="ded-mark js-fit">Q &amp; E</p>
+      <p class="ded-body">This game is dedicated to my inspirations, Quini and Emi.</p>
+      <p class="ded-shout">I LOVE YOU GUYS!</p>
+      <p class="ded-creed">Be Kind. Be Calm.</p>
+      <p class="ded-sign">- David &amp; BHB -</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btnDedBack" type="button">Back</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panelPause" hidden>
+      <h2>Paused</h2>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnResume" type="button">Keep walking</button>
+        <button class="btn btn-ghost" id="btnQuit" type="button">End walk</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panelOver" hidden>
+      <p class="over-kicker" id="overKicker">Bob took a tumble</p>
+      <div class="final">
+        <span class="final-value" id="finalScore">0</span>
+        <span class="final-unit">feet</span>
+      </div>
+      <p class="final-best" id="finalBest"></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnAgain" type="button">Walk again</button>
+        <button class="btn btn-ghost" id="btnShare" type="button">Share score</button>
+      </div>
+      <button class="btn btn-text" id="btnMenu" type="button">Back to start</button>
+    </section>
+
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<noscript>
+  <div class="noscript">Balance Big Head Bob needs JavaScript switched on to run.</div>
+</noscript>
+
+<script src="js/rig.js"></script>
+<script src="js/world.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

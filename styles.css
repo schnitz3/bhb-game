@@ -1,0 +1,659 @@
+/* Balance Big Head Bob — shell, HUD and menus.
+   The beach and Bob are drawn on <canvas>; everything you read is real DOM so it
+   stays crisp on any screen and works with screen readers and large-text settings. */
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("assets/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --blue: #38b6ff;
+  --red: #ff3131;
+  --purple: #cb6ce6;
+  --pink: #ff66c4;
+  --ink: #123a5c;
+  --ink-soft: #4a7196;
+  --paper: #ffffff;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+
+  --gap: clamp(8px, 2vmin, 18px);
+  --radius: 18px;
+  --shadow: 0 10px 30px rgba(18, 58, 92, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #38b6ff;
+  color: var(--ink);
+  font-family: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Nothing on the playfield is aimed at, so the pointer just sits on top of Bob.
+   It comes back over the HUD buttons and on every menu. */
+#app.playing #stage,
+#app.playing .zone { cursor: none; }
+
+/* ---------------------------------------------------------------- hold zones */
+
+.zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding-bottom: calc(var(--safe-b) + clamp(14px, 5vh, 54px));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, background-color 160ms ease;
+  color: #fff;
+  text-shadow: 0 3px 10px rgba(18, 58, 92, 0.55);
+  z-index: 3;
+}
+#zoneL { left: 0; background: linear-gradient(to right, rgba(56, 182, 255, 0.42), rgba(56, 182, 255, 0)); }
+#zoneR { right: 0; background: linear-gradient(to left, rgba(255, 102, 196, 0.42), rgba(255, 102, 196, 0)); }
+
+/* live during play so touches are captured */
+#app.playing .zone { pointer-events: auto; }
+
+/* Faint while playing, bright while held or being coached, and bright during
+   the countdown: that is dead time, so it is when the controls are worth
+   reading. 0.16 was too faint for the small keyboard hint to be legible. */
+#app.playing .zone { opacity: 0.3; }
+#app.teaching .zone { opacity: 0.85; }
+.zone.held { opacity: 0.95 !important; }
+.zone.coach { opacity: 0.7 !important; animation: zonePulse 900ms ease-in-out infinite; }
+
+@keyframes zonePulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.95; }
+}
+
+.zone-arrow { font-size: clamp(30px, 7vmin, 64px); line-height: 1; }
+.zone-word { font-size: clamp(11px, 2vmin, 17px); font-weight: 700; letter-spacing: 0.14em; }
+
+/* One line naming both controls, sitting between the two hold labels. It is up
+   for the length of the countdown, which is dead time with nothing to react to,
+   and fades once the walk starts. */
+#controlsHint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + clamp(8px, 2.4vh, 26px));
+  transform: translateX(-50%);
+  z-index: 4;
+  /* hug the words: the break is explicit, so max-content is the longest line
+     rather than the whole sentence */
+  width: max-content;
+  max-width: min(92vw, 460px);
+  padding: clamp(6px, 1.4vmin, 11px) clamp(14px, 2.4vw, 22px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  text-align: center;
+  font-size: clamp(11px, 1.9vmin, 16px);
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(18, 58, 92, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+#app.playing.teaching #controlsHint { opacity: 1; }
+
+/* A phone has no arrow keys, so it gets the half of the sentence that is true. */
+.hint-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .hint-keys { display: none; }
+  .hint-touch { display: inline; }
+}
+
+/* --------------------------------------------------------------------- HUD */
+
+/* Narrow screens stack: scores and buttons on one line, the lean meter across
+   the full width underneath. Wide screens put all three on a single row. */
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "scores buttons"
+    "meter  meter";
+  align-items: start;
+  gap: calc(var(--gap) * 0.6) var(--gap);
+  padding: calc(var(--safe-t) + var(--gap)) calc(var(--safe-r) + var(--gap))
+           0 calc(var(--safe-l) + var(--gap));
+  pointer-events: none;
+}
+#hud[hidden] { display: none; }
+
+.hud-scores { grid-area: scores; }
+
+/* On the menus only the sound and full-screen controls stay reachable. */
+#hud.menu .hud-scores,
+#hud.menu #meter,
+#hud.menu #btnPause { display: none; }
+#meter { grid-area: meter; justify-self: center; }
+.hud-buttons { grid-area: buttons; }
+
+@media (min-width: 620px) {
+  #hud {
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas: "scores meter buttons";
+  }
+  #coach { top: calc(var(--safe-t) + clamp(70px, 13vmin, 116px)); }
+}
+
+.hud-scores { display: flex; flex-wrap: wrap; gap: clamp(6px, 2vw, 20px); }
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px clamp(8px, 1.6vw, 14px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(18, 58, 92, 0.16);
+  line-height: 1;
+}
+.stat-label {
+  font-size: clamp(9px, 1.5vmin, 12px);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-soft);
+}
+.stat-value {
+  font-size: clamp(17px, 3.4vmin, 30px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.stat-unit { font-size: clamp(9px, 1.5vmin, 13px); color: var(--ink-soft); }
+.stat-best .stat-value { color: var(--purple); }
+
+/* lean meter — the main teaching device */
+#meter { width: min(78vw, 340px); }
+@media (min-width: 620px) { #meter { width: clamp(180px, 32vw, 340px); } }
+
+.meter-track {
+  position: relative;
+  height: clamp(12px, 2.4vmin, 20px);
+  border-radius: 999px;
+  background: linear-gradient(to right,
+    var(--red) 0%, #ffb03a 22%, #7ed957 44%,
+    #7ed957 56%, #ffb03a 78%, var(--red) 100%);
+  box-shadow: inset 0 2px 5px rgba(18, 58, 92, 0.3), 0 3px 10px rgba(18, 58, 92, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+.meter-centre {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.85);
+}
+.meter-needle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: clamp(9px, 1.7vmin, 14px);
+  margin-left: calc(clamp(9px, 1.7vmin, 14px) / -2);
+  border-radius: 999px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  transform: translateX(0);
+  will-change: transform;
+}
+.meter-caption {
+  margin-top: 4px;
+  text-align: center;
+  font-size: clamp(10px, 1.7vmin, 14px);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(18, 58, 92, 0.6);
+  letter-spacing: 0.04em;
+}
+
+.hud-buttons { display: flex; gap: 6px; justify-content: flex-end; pointer-events: auto; }
+
+.icon-btn {
+  width: clamp(32px, 6.4vmin, 46px);
+  height: clamp(32px, 6.4vmin, 46px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(18, 58, 92, 0.16);
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.icon-btn:hover { background: #fff; }
+.icon-btn:active { transform: scale(0.92); }
+.icon-btn svg {
+  width: 58%;
+  height: 58%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn svg .spk { fill: currentColor; stroke: none; }
+.icon-btn .slash { display: none; }
+#btnSound[aria-pressed="true"] .waves { display: none; }
+#btnSound[aria-pressed="true"] .slash { display: block; }
+
+/* ------------------------------------------------------------- coach line */
+
+#coach {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--safe-t) + clamp(96px, 20vmin, 132px));
+  transform: translateX(-50%);
+  z-index: 4;
+  max-width: min(88vw, 560px);
+  padding: clamp(7px, 1.6vmin, 13px) clamp(14px, 3vw, 26px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+  text-align: center;
+  font-size: clamp(13px, 2.4vmin, 21px);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+  pointer-events: none;
+  animation: coachIn 260ms ease both;
+}
+#coach[hidden] { display: none; }
+#coach.urgent { background: var(--red); color: #fff; }
+@keyframes coachIn {
+  from { opacity: 0; transform: translate(-50%, -10px) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ---------------------------------------------------------------- overlay */
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-t) + 12px) calc(var(--safe-r) + 12px)
+           calc(var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+  background: rgba(18, 58, 92, 0.42);
+  backdrop-filter: blur(3px);
+  overflow: auto;
+}
+#overlay[hidden] { display: none; }
+
+.panel {
+  width: min(94vw, 460px);
+  max-height: 100%;
+  padding: clamp(16px, 3.6vmin, 34px) clamp(16px, 4vmin, 34px);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: panelIn 240ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.panel[hidden] { display: none; }
+.panel-wide { width: min(94vw, 580px); text-align: left; }
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+.wordmark { margin: 0 0 6px; line-height: 1; }
+.wordmark span {
+  display: block;
+  /* the wordmark runs at line-height 1, so the two rows need an explicit gap */
+  margin-bottom: clamp(6px, 1.6vmin, 14px);
+  font-size: clamp(15px, 3.2vmin, 24px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.wordmark em {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  /* The name never breaks across lines; game.js shrinks it to fit the panel. */
+  white-space: nowrap;
+  font-size: clamp(24px, 6.6vmin, 50px);
+  background: linear-gradient(100deg, var(--blue), var(--purple) 48%, var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Balanced wrapping: the browser evens out the lines instead of leaving one
+   or two orphaned words on the last one. */
+.tagline, .hint-line, .best-line, .loading-note, .final-best, .over-kicker,
+.keys-line, .meter-caption, #coach, .steps li span:last-child,
+.panel h2, .noscript {
+  text-wrap: balance;
+  text-wrap-style: balance;
+}
+
+.tagline {
+  margin: 0 0 clamp(14px, 3vmin, 24px);
+  font-size: clamp(12px, 2.1vmin, 17px);
+  color: var(--ink-soft);
+  letter-spacing: 0.03em;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: clamp(12px, 2.6vmin, 22px);
+}
+
+.btn {
+  flex: 1 1 auto;
+  min-width: 140px;
+  min-height: 48px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: clamp(14px, 2.3vmin, 19px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+.btn:active { transform: translateY(2px) scale(0.98); }
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(100deg, var(--blue), var(--purple) 55%, var(--pink));
+  box-shadow: 0 6px 18px rgba(203, 108, 230, 0.42);
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-ghost {
+  color: var(--ink);
+  background: #eef5fb;
+  box-shadow: inset 0 0 0 2px #d3e6f5;
+}
+.btn-ghost:hover { background: #e3eff8; }
+.btn-text {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 40px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: clamp(12px, 1.9vmin, 15px);
+  text-decoration: underline;
+}
+
+.best-line { margin: clamp(12px, 2.4vmin, 20px) 0 0; font-size: clamp(12px, 2vmin, 16px); color: var(--ink-soft); }
+.best-line strong { color: var(--purple); font-size: 1.2em; }
+.hint-line { margin: 8px 0 0; font-size: clamp(11px, 1.8vmin, 14px); color: var(--ink-soft); }
+
+.loading-note { margin: 10px 0 0; font-size: clamp(11px, 1.9vmin, 15px); color: var(--ink-soft); }
+.bar {
+  height: 12px;
+  margin-top: clamp(14px, 3vmin, 24px);
+  border-radius: 999px;
+  background: #e7f1f9;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--purple), var(--pink));
+  transition: width 180ms ease;
+}
+.loader-bob {
+  width: clamp(46px, 11vmin, 76px);
+  height: clamp(46px, 11vmin, 76px);
+  margin: 0 auto clamp(10px, 2.4vmin, 18px);
+  border-radius: 50% 50% 46% 46%;
+  background: linear-gradient(160deg, #d9ecfb, var(--blue));
+  box-shadow: inset 0 -6px 14px rgba(18, 58, 92, 0.18);
+  animation: wobble 1.4s ease-in-out infinite;
+}
+@keyframes wobble {
+  0%, 100% { transform: rotate(-13deg); }
+  50% { transform: rotate(13deg); }
+}
+
+#panelHow h2, #panelPause h2 {
+  margin: 0 0 clamp(10px, 2.4vmin, 18px);
+  font-size: clamp(20px, 4.2vmin, 30px);
+  color: var(--ink);
+  /* the steps below read as a list and stay left aligned; the heading sits
+     over the whole panel, so it is centred */
+  text-align: center;
+}
+
+/* ------------------------------------------------------------- dedication */
+
+.text-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 2vw, 18px);
+  justify-content: center;
+  align-items: center;
+}
+
+#panelDedication { text-align: center; }
+
+.ded-mark {
+  margin: 0 0 clamp(10px, 2.4vmin, 18px);
+  font-weight: 700;
+  line-height: 1;
+  /* stays on one line; game.js measures it and shrinks it to fit the panel */
+  white-space: nowrap;
+  font-size: clamp(52px, 15vmin, 108px);
+  letter-spacing: 0.04em;
+  background: linear-gradient(100deg, var(--blue), var(--purple) 50%, var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ded-body {
+  margin: 0;
+  font-size: clamp(14px, 2.4vmin, 19px);
+  line-height: 1.6;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.ded-shout {
+  margin: clamp(6px, 1.4vmin, 12px) 0 0;
+  font-size: clamp(15px, 2.7vmin, 22px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--red);
+  text-wrap: balance;
+}
+
+.ded-creed {
+  margin: clamp(12px, 2.6vmin, 20px) 0 0;
+  font-size: clamp(15px, 2.7vmin, 22px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--purple);
+}
+
+.ded-sign {
+  margin: clamp(8px, 1.8vmin, 14px) 0 0;
+  font-size: clamp(12px, 2vmin, 16px);
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.steps { margin: 0; padding: 0; list-style: none; display: grid; gap: clamp(8px, 1.8vmin, 14px); }
+.steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  font-size: clamp(13px, 2.1vmin, 17px);
+  line-height: 1.45;
+}
+.step-n {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--blue), var(--purple));
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+}
+.keys-line {
+  margin: clamp(12px, 2.6vmin, 20px) 0 0;
+  font-size: clamp(11px, 1.8vmin, 15px);
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #eef5fb;
+  box-shadow: inset 0 0 0 1.5px #cfe3f3;
+  font-family: inherit;
+  font-size: 0.94em;
+  color: var(--ink);
+}
+
+.over-kicker { margin: 0; font-size: clamp(13px, 2.3vmin, 19px); color: var(--ink-soft); }
+.final { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 4px 0 0; }
+.final-value {
+  font-size: clamp(44px, 11vmin, 84px);
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(100deg, var(--blue), var(--purple) 50%, var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.final-unit { font-size: clamp(14px, 2.6vmin, 21px); color: var(--ink-soft); }
+.final-best { margin: 6px 0 0; font-size: clamp(12px, 2vmin, 16px); color: var(--ink-soft); min-height: 1.4em; }
+.final-best.record { color: var(--pink); font-weight: 700; }
+
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 20px);
+  transform: translate(-50%, 20px);
+  z-index: 20;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(18, 58, 92, 0.92);
+  color: #fff;
+  font-size: clamp(12px, 2vmin, 16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.noscript {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 20px;
+  background: #38b6ff;
+  color: #fff;
+}
+
+/* ------------------------------------------------------- short/landscape */
+
+/* Phones on their side have almost no vertical room: shrink the chrome. */
+@media (orientation: landscape) and (max-height: 460px) {
+  #hud { gap: 8px; padding-top: calc(var(--safe-t) + 6px); }
+  .stat { padding: 4px 9px; }
+  .meter-caption { margin-top: 2px; }
+  #coach { top: calc(var(--safe-t) + 52px); padding: 5px 14px; }
+  .panel { padding: 14px 18px; }
+  .btn { min-height: 42px; padding: 9px 18px; }
+  .wordmark em { font-size: clamp(24px, 8vmin, 38px); }
+  .tagline { margin-bottom: 10px; }
+  .steps li { font-size: 13px; }
+  .final-value { font-size: clamp(34px, 13vmin, 56px); }
+}
+
+/* Tall screens have room to spare: park the menus near the top so Bob is not
+   hidden behind them while you read. */
+@media (orientation: portrait) and (min-height: 620px) {
+  #overlay { align-items: start; padding-top: calc(var(--safe-t) + 5vh); }
+}
+
+@media (min-width: 900px) and (min-height: 700px) {
+  .panel { width: min(90vw, 520px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
