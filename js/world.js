@@ -197,10 +197,13 @@
   World.prototype._dolphin = function (ctx) {
     var run = this.dolphinRun;
     if (!run || !this.dolphin) { return; }
+    // the sheet is a 4x4 grid; read the cell size off the image so the art can
+    // be re-exported at a different resolution without touching this
+    var cell = this.dolphin.width / 4;
     var p = run.t / run.dur;
     var frame = Math.min(15, Math.floor(p * 16));
-    var sx = (frame % 4) * 256;
-    var sy = Math.floor(frame / 4) * 256;
+    var sx = (frame % 4) * cell;
+    var sy = Math.floor(frame / 4) * cell;
     var size = Math.min(this.w, this.h) * 0.16;
     var x = this.w * run.x;
     var y = this.horizonY + this.seaH * 0.55 - size * 0.5;
@@ -210,9 +213,9 @@
     if (run.flip) {
       ctx.translate(x + size, y);
       ctx.scale(-1, 1);
-      ctx.drawImage(this.dolphin, sx, sy, 256, 256, 0, 0, size, size);
+      ctx.drawImage(this.dolphin, sx, sy, cell, cell, 0, 0, size, size);
     } else {
-      ctx.drawImage(this.dolphin, sx, sy, 256, 256, x, y, size, size);
+      ctx.drawImage(this.dolphin, sx, sy, cell, cell, x, y, size, size);
     }
     ctx.restore();
   };
