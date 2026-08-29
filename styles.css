@@ -107,26 +107,37 @@ html, body {
 .zone-arrow { font-size: clamp(30px, 7vmin, 64px); line-height: 1; }
 .zone-word { font-size: clamp(11px, 2vmin, 17px); font-weight: 700; letter-spacing: 0.14em; }
 
-/* Keyboard hint. Hidden by default and shown only for a mouse-and-keyboard
-   pointer, so phones and tablets are not told to press a key they do not have. */
-.zone-key {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: clamp(10px, 1.7vmin, 14px);
-  letter-spacing: 0.02em;
-}
-.zone-key kbd {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 0 0 1.5px rgba(18, 58, 92, 0.25), 0 2px 0 rgba(18, 58, 92, 0.35);
+/* One line naming both controls, sitting between the two hold labels. It is up
+   for the length of the countdown, which is dead time with nothing to react to,
+   and fades once the walk starts. */
+#controlsHint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + clamp(8px, 2.4vh, 26px));
+  transform: translateX(-50%);
+  z-index: 4;
+  max-width: min(94vw, 620px);
+  padding: clamp(5px, 1.2vmin, 10px) clamp(12px, 3vw, 24px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
-  text-shadow: none;
-  font-size: 1.15em;
-  padding: 1px 8px;
+  text-align: center;
+  text-wrap: balance;
+  font-size: clamp(11px, 1.9vmin, 16px);
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(18, 58, 92, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
 }
-@media (hover: hover) and (pointer: fine) {
-  .zone-key { display: inline-flex; }
+#app.playing.teaching #controlsHint { opacity: 1; }
+
+/* A phone has no arrow keys, so it gets the half of the sentence that is true. */
+.hint-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .hint-keys { display: none; }
+  .hint-touch { display: inline; }
 }
 
 /* --------------------------------------------------------------------- HUD */

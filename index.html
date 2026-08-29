@@ -31,15 +31,13 @@
   <canvas id="stage" aria-label="Big Head Bob balancing on the beach"></canvas>
 
   <!-- Hold zones. Pointer targets only; the visible coaching marks are drawn inside. -->
-  <div id="zoneL" class="zone" aria-hidden="true">
-    <span class="zone-arrow">◀</span>
-    <span class="zone-word">HOLD</span>
-    <span class="zone-key">or hold <kbd>←</kbd></span>
-  </div>
-  <div id="zoneR" class="zone" aria-hidden="true">
-    <span class="zone-arrow">▶</span>
-    <span class="zone-word">HOLD</span>
-    <span class="zone-key">or hold <kbd>→</kbd></span>
+  <div id="zoneL" class="zone" aria-hidden="true"><span class="zone-arrow">◀</span><span class="zone-word">HOLD</span></div>
+  <div id="zoneR" class="zone" aria-hidden="true"><span class="zone-arrow">▶</span><span class="zone-word">HOLD</span></div>
+
+  <!-- One line covering both controls, shown across the countdown. -->
+  <div id="controlsHint" aria-hidden="true">
+    <span class="hint-keys">Hold left or right arrows or either side of the screen</span>
+    <span class="hint-touch">Hold either side of the screen</span>
   </div>
 
   <header id="hud" hidden>
