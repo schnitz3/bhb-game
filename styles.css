@@ -433,8 +433,68 @@ html, body {
   margin: 0 0 clamp(10px, 2.4vmin, 18px);
   font-size: clamp(20px, 4.2vmin, 30px);
   color: var(--ink);
+  /* the steps below read as a list and stay left aligned; the heading sits
+     over the whole panel, so it is centred */
+  text-align: center;
 }
-#panelPause h2 { text-align: center; }
+
+/* ------------------------------------------------------------- dedication */
+
+.text-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 2vw, 18px);
+  justify-content: center;
+  align-items: center;
+}
+
+#panelDedication { text-align: center; }
+
+.ded-mark {
+  margin: 0 0 clamp(10px, 2.4vmin, 18px);
+  font-weight: 700;
+  line-height: 1;
+  /* stays on one line; game.js measures it and shrinks it to fit the panel */
+  white-space: nowrap;
+  font-size: clamp(52px, 15vmin, 108px);
+  letter-spacing: 0.04em;
+  background: linear-gradient(100deg, var(--blue), var(--purple) 50%, var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ded-body {
+  margin: 0;
+  font-size: clamp(14px, 2.4vmin, 19px);
+  line-height: 1.6;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.ded-shout {
+  margin: clamp(6px, 1.4vmin, 12px) 0 0;
+  font-size: clamp(15px, 2.7vmin, 22px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--red);
+  text-wrap: balance;
+}
+
+.ded-creed {
+  margin: clamp(12px, 2.6vmin, 20px) 0 0;
+  font-size: clamp(15px, 2.7vmin, 22px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--purple);
+}
+
+.ded-sign {
+  margin: clamp(8px, 1.8vmin, 14px) 0 0;
+  font-size: clamp(12px, 2vmin, 16px);
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
 
 .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: clamp(8px, 1.8vmin, 14px); }
 .steps li {

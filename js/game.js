@@ -189,6 +189,7 @@
       load: $('panelLoad'),
       title: $('panelTitle'),
       how: $('panelHow'),
+      dedication: $('panelDedication'),
       pause: $('panelPause'),
       over: $('panelOver')
     },
@@ -265,7 +266,8 @@
     fitWordmarks();
   }
 
-  /* "Big Head Bob" always sits on one line.
+  /* Headline text that must never wrap: the game's name, and the Q & E mark on
+     the dedication screen.
 
      Measure the text itself with canvas metrics rather than the element's
      scrollWidth: the name is a block, so its scrollWidth never falls below its
@@ -277,7 +279,7 @@
 
   function fitWordmarks() {
     if (!_probe) { _probe = document.createElement('canvas').getContext('2d'); }
-    var marks = document.querySelectorAll('.wordmark em');
+    var marks = document.querySelectorAll('.wordmark em, .js-fit');
 
     for (var i = 0; i < marks.length; i++) {
       var em = marks[i];
@@ -1082,6 +1084,17 @@
   $('btnPlay').addEventListener('click', function () { Audio_.unlock(); Audio_.play('ButtonClick'); startRun(); });
   $('btnHow').addEventListener('click', function () { Audio_.play('ButtonClick'); S.mode = 'how'; showPanel('how'); updateTiltButton(); });
   $('btnHowBack').addEventListener('click', function () { Audio_.play('ButtonClick'); toTitle(); });
+  $('btnDedication').addEventListener('click', function () {
+    Audio_.play('ButtonClick');
+    S.mode = 'how';
+    showPanel('dedication');
+  });
+  $('btnDedBack').addEventListener('click', function () {
+    Audio_.play('ButtonClick');
+    S.mode = 'how';
+    showPanel('how');
+    updateTiltButton();
+  });
   $('btnTutorial').addEventListener('click', function () { Audio_.unlock(); Audio_.play('ButtonClick'); startTutorial(); });
   $('btnResume').addEventListener('click', function () { Audio_.play('ButtonClick'); resume(); });
   $('btnQuit').addEventListener('click', function () { Audio_.play('ButtonClick'); Audio_.stopMusic(); toTitle(); });
