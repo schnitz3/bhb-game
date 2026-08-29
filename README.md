@@ -12,44 +12,72 @@ as an app, and plays offline once it has loaded.
 
 There is nothing to build. The folder is the site.
 
-1. Create a new, empty repository on GitHub called `bhb-game` (public).
-2. In a terminal, from inside this folder:
+1. On GitHub, create a new empty **public** repository called `bhb-game`. Do not
+   add a README or a licence, or the first push will be rejected.
+2. From inside this folder:
 
 ```bash
-git init -b main && git add -A && git commit -m "Balance Big Head Bob" && git remote add origin https://github.com/YOUR-USERNAME/bhb-game.git && git push -u origin main
+git remote add origin https://github.com/schnitz3/bhb-game.git && git push -u origin main
 ```
 
-3. On GitHub go to the repository's **Settings > Pages**, set **Source** to
-   *Deploy from a branch*, pick branch `main` and folder `/ (root)`, and save.
-4. A minute later the game is live at:
+3. In the new repository go to **Settings > Pages**, set **Source** to
+   *Deploy from a branch*, choose branch `main` and folder `/ (root)`, and save.
+4. Give it a minute. The game is then live at:
 
 ```
-https://YOUR-USERNAME.github.io/bhb-game/
+https://schnitz3.github.io/bhb-game/
 ```
 
-Replace `YOUR-USERNAME` with your GitHub username in both places.
+The paths are all relative and this has been checked from a subfolder, so the
+project-site URL works as-is.
 
-### Putting it on your main site
+### Putting it on the Shopify site
 
-Once it is live you can drop it into any page (Squarespace, Wix, WordPress,
-anything at all) with one embed:
+bigheadbob.com runs on Shopify, whose page editor strips `<iframe>` out of rich
+text. Use a Custom Liquid section instead:
+
+1. **Online Store > Pages > Add page.** Title it *Play* (or whatever the URL
+   should read), leave the body empty, save.
+2. **Online Store > Themes > Customize.** In the page dropdown at the top,
+   switch to the page you just made.
+3. **Add section > Custom Liquid**, paste the block below, and save.
 
 ```html
-<iframe src="https://YOUR-USERNAME.github.io/bhb-game/"
-        style="width:100%;aspect-ratio:9/16;max-height:90vh;border:0"
-        allow="fullscreen; accelerometer" title="Balance Big Head Bob"></iframe>
+<div class="bhb-game-wrap">
+  <iframe src="https://schnitz3.github.io/bhb-game/"
+          title="Balance Big Head Bob"
+          allow="fullscreen; accelerometer; autoplay"
+          allowfullscreen></iframe>
+</div>
+<style>
+  .bhb-game-wrap { max-width: 1100px; margin: 0 auto; }
+  .bhb-game-wrap iframe {
+    display: block; width: 100%; height: 70vh; min-height: 520px;
+    border: 0; border-radius: 16px; background: #38b6ff;
+  }
+  @media (max-width: 749px) {
+    .bhb-game-wrap iframe { height: 78vh; min-height: 480px; border-radius: 12px; }
+  }
+</style>
 ```
 
-`accelerometer` is what lets the tilt controls work inside the frame.
+`accelerometer` is what lets the tilt controls work inside the frame, and
+`allowfullscreen` is what lets the full-screen button work. Without them the
+game still plays, those two features just do nothing.
+
+If a visitor would rather play it full-bleed, link them straight to
+`https://schnitz3.github.io/bhb-game/`.
 
 ### Shipping a change
 
 Edit, commit, push. One thing to remember: the service worker caches the art and
 audio, so if you **rename, add or delete** a file in `assets/`, bump the version
-string at the top of `sw.js` (`bhb-game-v2` becomes `bhb-game-v3`, and so on)
-in the same commit.
-Changes to HTML, CSS and JS reach players without that, because those are fetched
-from the network first.
+string at the top of `sw.js` (`bhb-game-v5` becomes `bhb-game-v6`, and so on)
+in the same commit. Changes to HTML, CSS and JS reach players without that,
+because those are fetched from the network first.
+
+If you ever move the game to a different URL, update `og:url` and `og:image` in
+`index.html` as well, since a share card needs an absolute address.
 
 ---
 
