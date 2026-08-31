@@ -25,7 +25,7 @@ git remote add origin https://github.com/schnitz3/bhb-game.git && git push -u or
 4. Give it a minute. The game is then live at:
 
 ```
-https://schnitz3.github.io/bhb-game/
+https://balance.bigheadbob.com/
 ```
 
 The paths are all relative and this has been checked from a subfolder, so the
@@ -44,7 +44,7 @@ text. Use a Custom Liquid section instead:
 
 ```html
 <div class="bhb-game-wrap">
-  <iframe src="https://schnitz3.github.io/bhb-game/"
+  <iframe src="https://balance.bigheadbob.com/"
           title="Balance Big Head Bob"
           allow="fullscreen; accelerometer; autoplay"
           allowfullscreen></iframe>
@@ -66,7 +66,7 @@ text. Use a Custom Liquid section instead:
 game still plays, those two features just do nothing.
 
 If a visitor would rather play it full-bleed, link them straight to
-`https://schnitz3.github.io/bhb-game/`.
+`https://balance.bigheadbob.com/`.
 
 ### Shipping a change
 
