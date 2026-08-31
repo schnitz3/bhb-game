@@ -234,6 +234,7 @@
     shout: null,
     nextShout: SHOUT_MIN,
     beatBest: false,
+    recordThisRun: false,
     gustIn: -1,
     gustDir: 1,
     nextGust: 3,
@@ -593,6 +594,7 @@
     el.hud.classList.add('menu');
     var feet = Math.round(S.dist);
     var isBest = feet > S.best;
+    S.recordThisRun = isBest;
     if (isBest) { S.best = feet; Store.set('best', feet); }
 
     el.finalScore.textContent = feet;
@@ -1204,9 +1206,17 @@
      Now every failure falls through to the next option, and the last one is a
      panel with the text on screen, which cannot fail. */
 
+  /* The score is the reason anyone shares this, so it leads, and the line ends
+     on a challenge with the link falling in straight after it. */
   function shareLine() {
     var feet = Math.round(S.dist);
-    return 'I walked ' + feet + ' ft in Balance Big Head Bob! Balance. Breathe. Be your best.';
+    var best = Math.round(S.best);
+    if (S.recordThisRun) {
+      return 'New high score! I walked ' + feet +
+        ' ft in Balance Big Head Bob. Beat my high score:';
+    }
+    return 'I walked ' + feet + ' ft in Balance Big Head Bob. My best is ' + best +
+      ' ft. Beat my high score:';
   }
 
   function shareUrl() { return location.href.split('#')[0].split('?')[0]; }
