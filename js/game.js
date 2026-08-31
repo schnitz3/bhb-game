@@ -1238,18 +1238,31 @@
     } catch (e) { return false; }
   }
 
-  function copyOrShow(payload) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(payload).then(function () {
-        toast('Score copied. Paste it anywhere!');
-      }, function () {
-        if (legacyCopy(payload)) { toast('Score copied. Paste it anywhere!'); }
-        else { showSharePanel(payload); }
-      });
-      return;
+  /* Copy, attempted while the click that triggered it is still the live user
+     gesture. Deliberately not chained off another promise: once the gesture is
+     spent, navigator.clipboard.writeText does not merely reject, it can hang
+     without ever settling. That is exactly how the previous fallback managed to
+     do nothing at all, on both desktop and mobile. */
+  function copyNow(payload, done) {
+    var finished = false;
+    function finish(ok) {
+      if (finished) { return; }
+      finished = true;
+      done(ok);
     }
-    if (legacyCopy(payload)) { toast('Score copied. Paste it anywhere!'); }
-    else { showSharePanel(payload); }
+    // whatever the clipboard does, or fails to do, the player gets an answer
+    setTimeout(function () { finish(legacyCopy(payload)); }, 900);
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        navigator.clipboard.writeText(payload).then(
+          function () { finish(true); },
+          function () { finish(legacyCopy(payload)); }
+        );
+        return;
+      } catch (e) { /* fall through to the timer */ }
+    }
+    finish(legacyCopy(payload));
   }
 
   $('btnShare').addEventListener('click', function () {
@@ -1257,40 +1270,35 @@
     var text = shareLine();
     var url = shareUrl();
     var payload = text + ' ' + url;
-
     var data = { title: 'Balance Big Head Bob', text: text, url: url };
-    var shareable = !navigator.canShare || navigator.canShare(data);
 
-    if (navigator.share && shareable) {
-      var attempt;
+    if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+      var attempt = null;
       try { attempt = navigator.share(data); } catch (e) { attempt = null; }
       if (attempt && attempt.then) {
         attempt.then(null, function (err) {
-          // closing the share sheet is not a failure worth reacting to
+          // closing the sheet is a choice, not a failure
           if (err && err.name === 'AbortError') { return; }
-          copyOrShow(payload);
+          /* Anything else means the sheet never opened. Do not try to copy from
+             in here: the gesture is spent and the clipboard would hang. Show the
+             panel, whose buttons each carry a fresh gesture of their own. */
+          showSharePanel(payload);
         });
         return;
       }
     }
-    copyOrShow(payload);
+    // no native sheet, so copy right now while the click still counts
+    copyNow(payload, function (ok) {
+      if (ok) { toast('Score copied. Paste it anywhere!'); }
+      else { showSharePanel(payload); }
+    });
   });
 
   $('btnShareCopy').addEventListener('click', function () {
     Audio_.play('ButtonClick');
-    var payload = $('shareText').value;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(payload).then(function () {
-        toast('Score copied. Paste it anywhere!');
-      }, function () {
-        if (!legacyCopy(payload)) { toast('Select the text above and copy it.'); }
-        else { toast('Score copied. Paste it anywhere!'); }
-      });
-    } else if (legacyCopy(payload)) {
-      toast('Score copied. Paste it anywhere!');
-    } else {
-      toast('Select the text above and copy it.');
-    }
+    copyNow($('shareText').value, function (ok) {
+      toast(ok ? 'Score copied. Paste it anywhere!' : 'Select the text above and copy it.');
+    });
   });
 
   $('btnShareBack').addEventListener('click', function () {

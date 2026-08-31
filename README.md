@@ -33,46 +33,40 @@ project-site URL works as-is.
 
 ### Putting it on the Shopify site
 
-bigheadbob.com runs on Shopify, whose page editor strips `<iframe>` out of rich
-text. Use a Custom Liquid section instead:
+The game answers on its own domain at https://balance.bigheadbob.com/ (a CNAME
+onto GitHub Pages), and is embedded on the Shopify site at
+https://bigheadbob.com/pages/balance-bob-game.
 
-1. **Online Store > Pages > Add page.** Title it *Play* (or whatever the URL
-   should read), leave the body empty, save.
-2. **Online Store > Themes > Customize.** In the page dropdown at the top,
-   switch to the page you just made.
-3. **Add section > Custom Liquid**, paste the block below, and save.
+The embed does **not** go through a theme section. The Default page template has
+no "Add section" slot, so Custom Liquid is not available. It goes in the page's
+own HTML instead: **Online Store > Pages > the page**, then the `<>` button in
+the content toolbar. Shopify keeps `<iframe>` there, contrary to what is often
+claimed, but it does strip `<style>` blocks, so all the sizing has to be inline
+on the element:
 
 ```html
-<div class="bhb-game-wrap">
+<div style="max-width:1100px;margin:0 auto;">
   <iframe src="https://balance.bigheadbob.com/"
           title="Balance Big Head Bob"
-          allow="fullscreen; accelerometer; autoplay"
-          allowfullscreen></iframe>
+          allow="fullscreen; accelerometer; autoplay; web-share; clipboard-write"
+          allowfullscreen
+          style="display:block;width:100%;height:75vh;min-height:500px;border:0;border-radius:16px;background:#38b6ff;"></iframe>
 </div>
-<style>
-  .bhb-game-wrap { max-width: 1100px; margin: 0 auto; }
-  .bhb-game-wrap iframe {
-    display: block; width: 100%; height: 70vh; min-height: 520px;
-    border: 0; border-radius: 16px; background: #38b6ff;
-  }
-  @media (max-width: 749px) {
-    .bhb-game-wrap iframe { height: 78vh; min-height: 480px; border-radius: 12px; }
-  }
-</style>
 ```
 
-`accelerometer` is what lets the tilt controls work inside the frame, and
-`allowfullscreen` is what lets the full-screen button work. Without them the
-game still plays, those two features just do nothing.
+Each permission in `allow` buys one feature, and the game degrades quietly
+without any of them: `accelerometer` for tilt, `allowfullscreen` for the
+full-screen button, `web-share` for the native share sheet, `clipboard-write`
+for copying a score.
 
-If a visitor would rather play it full-bleed, link them straight to
-`https://balance.bigheadbob.com/`.
+Note that scores are stored per origin, so a best set on the GitHub Pages address
+does not follow the player to balance.bigheadbob.com, or into the embed.
 
 ### Shipping a change
 
 Edit, commit, push. One thing to remember: the service worker caches the art and
 audio, so if you **rename, add or delete** a file in `assets/`, bump the version
-string at the top of `sw.js` (`bhb-game-v5` becomes `bhb-game-v6`, and so on)
+string at the top of `sw.js` (`bhb-game-v7` becomes `bhb-game-v8`, and so on)
 in the same commit. Changes to HTML, CSS and JS reach players without that,
 because those are fetched from the network first.
 
